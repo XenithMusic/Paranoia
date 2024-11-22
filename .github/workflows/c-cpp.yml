@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install apt_dependencies
-      run: sudo apt install python3 grub
+      run: sudo apt install python3 grub-pc
     # - name: configure
     #   run: ./configure
     - name: clone i686-elf-tools

@@ -15,6 +15,10 @@ jobs:
     - uses: actions/checkout@v4
     # - name: configure
     #   run: ./configure
+    - name: compile
+      run: git clone git clone https://github.com/lordmilko/i686-elf-tools
+      run: cd i686-elf-tools
+      run: ./i686-elf-tools.sh linux
     - name: make
       run: make
     - name: make check

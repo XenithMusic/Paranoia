@@ -16,7 +16,7 @@ jobs:
     # - name: configure
     #   run: ./configure
     - name: compileClone
-      run: git clone git clone https://github.com/lordmilko/i686-elf-tools && cd i686-elf-tools && ./i686-elf-tools.sh linux
+      run: git clone https://github.com/lordmilko/i686-elf-tools && cd i686-elf-tools && ./i686-elf-tools.sh linux
     - name: make
       run: make
     - name: make check

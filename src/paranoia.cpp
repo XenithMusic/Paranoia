@@ -3,11 +3,33 @@
 #include "string.h"
 #include "const.h"
 #include "pit.h"
+#include "memory.h"
+#include "types.h"
+
+/*
+
+TODO:
+- Memory Management
+    [X] Parse MMAP table
+    [X] Basic kmalloc
+        [X] Allocate
+        [ ] Split memory when needed so you don't allocate lots of memory unnecessarily!
+    [ ] Basic kfree
+- Interrupt Descriptor Table
+    [ ] Make space for the IDT (figure out memory management first)
+    [ ] Tell the CPU where that is
+    [ ] Tell the PIC to screw off with BIOS defaults (https://wiki.osdev.org/PIC#Programming_the_PIC_chips)
+    [ ] Write a couple of ISR (interrupt service routines) for IRQs and exceptions
+    [ ] Put the addresses of the ISR handlers in the appropiate descriptors (in the IDT)
+    [ ] Enable all supported interrupts in the IRQ mask of the PIC
+
+*/
 
 extern "C" {
     
-    void kernel_main(void) {
+    void kernel_main(multiboot_info* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
+        Allocator::init(mbi);
         Terminal::init();
         Terminal::print("System information:\n");
         Terminal::print("KERNEL:             PARANOIA\n");

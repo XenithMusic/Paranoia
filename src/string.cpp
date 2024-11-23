@@ -41,36 +41,87 @@ extern "C" {
         // return buffer;
         return 0;
     }
-    char* parseInt(int num, char* str, int base) {
+    char* parseInt(int inNum, char* str, int base) {
         if (base < 2 or base > 16) {
             return (char*)"Base bad\n";
         }
         int i = 0;
-        if (num < 0 and base == 10) {
-            str[i++] = '-';
-        }
-        char digits[] = "0123456789abcdef";
-        int j = i;
-        while (num > 0) {
-            str[j++] = digits[num % base];
-            num /= base;
-        }
+        int num = inNum;
 
-        str[j] = '\0';
+        if (num == 0) {
+            str[i++] = '0';
+        } else {
+            // Only add negative sign if the number is negative and base is 10
+            if (num < 0 and base == 10) {
+                str[i++] = '-';
+                num = -num;
+            }
+            
+            char digits[] = "0123456789abcdef";
+            int j = i;
+            while (num > 0) {
+                str[j++] = digits[num % base];
+                num /= base;
+            }
 
-        int start = i;
-        int end = j - 1;
-        while (start < end) {
-            char temp = str[start];
-            str[start] = str[end];
-            str[end] = temp;
-            start++;
-            end--;
+            str[j] = '\0';
+
+            // Reverse the string
+            int start = i;
+            int end = j - 1;
+            while (start < end) {
+                char temp = str[start];
+                str[start] = str[end];
+                str[end] = temp;
+                start++;
+                end--;
+            }
         }
 
         return str;
     }
-    char* parseDouble(double num, char* str, int precision) {
+    char* parseU32(uint32_t inNum, char* str, int base) {
+        if (base < 2 or base > 16) {
+            return (char*)"Base bad\n";
+        }
+        int i = 0;
+        uint32_t num = inNum;
+
+        if (num == 0) {
+            str[i++] = '0';
+        } else {
+            // Only add negative sign if the number is negative and base is 10
+            if (num < 0 and base == 10) {
+                str[i++] = '-';
+                num = -num;
+            }
+            
+            char digits[] = "0123456789abcdef";
+            int j = i;
+            while (num > 0) {
+                str[j++] = digits[num % base];
+                num /= base;
+            }
+
+            str[j] = '\0';
+
+            // Reverse the string
+            int start = i;
+            int end = j - 1;
+            while (start < end) {
+                char temp = str[start];
+                str[start] = str[end];
+                str[end] = temp;
+                start++;
+                end--;
+            }
+        }
+
+        return str;
+    }
+
+    char* parseDouble(double inNum, char* str, int precision) {
+        double num = inNum;
         // Handle negative numbers
         if (num < 0) {
             str[0] = '-';
@@ -84,6 +135,7 @@ extern "C" {
         if (intPart == 0) {
             *ptr++ = '0';  // Explicitly add '0' for zero integer part
         } else {
+            // Now, parse the integer part without adding the negative sign again
             parseInt(intPart, ptr, 10);  // Call your parseInt function to convert the integer part
             // Move the pointer after the integer part
             while (*ptr != '\0') ptr++;

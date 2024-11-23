@@ -29,8 +29,15 @@ extern "C" {
     
     void kernel_main(multiboot_info* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
+
+        char* str; // pointer if anything demands a pointer
+
         Allocator::init(mbi);
         Terminal::init();
+        Terminal::print(parseU32((mbi->mmap_length),str,10));
+        Terminal::print(" bytes\n");
+        Terminal::print(parseU32((mbi->mmap_addr),str,10));
+        Terminal::print(" bytes\n");
         Terminal::print("System information:\n");
         Terminal::print("KERNEL:             PARANOIA\n");
         Terminal::print("- VERSION:            ");
@@ -39,12 +46,13 @@ extern "C" {
         Terminal::print("- COMPILATION DATE:   ");
             Terminal::print(CONST_COMPDATE);
             Terminal::print("\n");
+        Terminal::print("- AUTHORED BY:        ");
+            Terminal::print(CONST_AUTHOR);
+            Terminal::print("\n");
 
         // You can add more setup here (keyboard, time, etc.)
         
         // Now enter an infinite loop (just to keep the OS running)
-
-        char* str;
         Terminal::print(parseDouble(get_pit_seconds(),str,10));
         Terminal::print(" first call\n");
         Terminal::print(parseDouble(get_pit_seconds(),str,10));
@@ -61,7 +69,7 @@ extern "C" {
 
             tick = get_pit_seconds();
 
-            if (lastTick+0.2 < tick) {
+            if (lastTick+1 < tick) {
                 lastTick = tick;
                 Terminal::print(parseDouble(tick,str,10));
                 Terminal::print("\n");

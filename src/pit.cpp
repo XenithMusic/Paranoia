@@ -6,9 +6,8 @@ extern "C" {
 	uint64_t overflowCount;
 
 	void set_pit_count(int count) {
-		unsigned uc = count%65536;
 		overflowCount = 0;
-		unsigned previous_count = uc;
+		previous_count = count%65536;
 		// Disable interrupts
 		cli();
 		
@@ -43,5 +42,11 @@ extern "C" {
 		uint32_t count = get_pit_count();
 		double seconds = count / 1193182.0;
 		return seconds;
+	}
+
+	void sleep(double seconds) {
+		double now = get_pit_seconds();
+		while (get_pit_seconds() < now+seconds) {};
+		return;
 	}
 }

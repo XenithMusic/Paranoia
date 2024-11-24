@@ -1,5 +1,12 @@
 /*
-I ADMIT, THIS ASSEMBLY CODE IS DIRECTLY COPIED FROM THE OSDEV WIKI. PLEASE DON'T KILL ME.
+This code is directly taken from the OSDev.org Bare Bones page.
+https://wiki.osdev.org/Bare_Bones
+
+This code is Public Domain, as stated by OSDev HERE:
+https://wiki.osdev.org/OSDev_Wiki:License
+
+General Disclaimer:
+https://wiki.osdev.org/OSDev_Wiki:General_disclaimer
 */
 
 /* Declare constants for the multiboot header. */

@@ -17,7 +17,7 @@ CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o assemblyUtils.o pit.o math.o memory.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o assemblyUtils.o pit.o math.o memory.o fail.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -49,6 +49,9 @@ assemblyUtils.o: src/assemblyUtils.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 pit.o: src/pit.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+fail.o: src/fail.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Link the kernel

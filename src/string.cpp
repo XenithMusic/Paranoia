@@ -39,6 +39,8 @@ extern "C" {
         // buffer[lenA + lenB] = '\0';
 
         // return buffer;
+        a = a;
+        b = b;
         return 0;
     }
     char* parseInt(int inNum, char* str, int base) {
@@ -90,12 +92,6 @@ extern "C" {
         if (num == 0) {
             str[i++] = '0';
         } else {
-            // Only add negative sign if the number is negative and base is 10
-            if (num < 0 and base == 10) {
-                str[i++] = '-';
-                num = -num;
-            }
-            
             char digits[] = "0123456789abcdef";
             int j = i;
             while (num > 0) {

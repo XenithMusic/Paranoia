@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install apt_dependencies
-      run: sudo apt install python3 grub-pc
+      run: sudo apt install python3 grub-pc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo libisl-dev
     # - name: configure
     #   run: ./configure
     - name: clone i686-elf-tools

@@ -24,7 +24,6 @@ extern "C" {
         if (x <= 0) return 0; // Error: ln is undefined for non-positive values
         double result = 0;
         double term = (x - 1) / (x + 1);
-        double term_squared = term * term;
         
         for (int i = 1; i < 100; i += 2) {
             result += (1.0 / i) * pow(term, i);

@@ -1,26 +1,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "string.h"
+#include "types.h"
 
 namespace Terminal {
-    enum vga_color {
-        VGA_COLOR_BLACK = 0,
-        VGA_COLOR_BLUE = 1,
-        VGA_COLOR_GREEN = 2,
-        VGA_COLOR_CYAN = 3,
-        VGA_COLOR_RED = 4,
-        VGA_COLOR_MAGENTA = 5,
-        VGA_COLOR_BROWN = 6,
-        VGA_COLOR_LIGHT_GREY = 7,
-        VGA_COLOR_DARK_GREY = 8,
-        VGA_COLOR_LIGHT_BLUE = 9,
-        VGA_COLOR_LIGHT_GREEN = 10,
-        VGA_COLOR_LIGHT_CYAN = 11,
-        VGA_COLOR_LIGHT_RED = 12,
-        VGA_COLOR_LIGHT_MAGENTA = 13,
-        VGA_COLOR_LIGHT_BROWN = 14,
-        VGA_COLOR_WHITE = 15,
-    };
 
     static const size_t VGA_WIDTH = 80;
     static const size_t VGA_HEIGHT = 25;
@@ -88,6 +71,8 @@ namespace Terminal {
         swapBuffers();
     }
 
+    void GPL();
+
     void init(void)
     {
         row = 0;
@@ -96,6 +81,7 @@ namespace Terminal {
         buffer = (uint16_t*) 0xB8000;
         clearBuffer = (uint16_t*) 0xC0000;
         clearScreen();
+        GPL();
     }
 
     void putEntryAt(char c, uint8_t color, size_t x, size_t y) {
@@ -127,4 +113,26 @@ namespace Terminal {
     void print(const char* str) {
         write(str,strlen(str));
     }
+    void GPL() {
+        print("Paranoia  Copyright (C) 2024  XenithMusic\n");
+        print("This program comes with ABSOLUTELY NO WARRANTY\n");
+        print("This is free software, and you are welcome to redistribute it\n");
+        print("under certain conditions.\n");
+        print("See the GPLv3 license for more details.\n");
+        print("\n");
+    }
+
+    void setRow(int value) {
+        row = value;
+    }
+
+    void setCol(int value) {
+        col = value;
+    }
 }
+/*
+    <program>  Copyright (C) <year>  <name of author>
+    This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.
+*/

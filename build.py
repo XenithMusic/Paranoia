@@ -10,7 +10,7 @@ with open("Makefile","r") as f:
 	data = f.read().split("\n")
 
 constants = {
-	"CONST_VERSION":"\"indev-2024-11-23\""
+	"CONST_VERSION":"\"indev-2025-01-24\""
 }
 
 # dynamic constants

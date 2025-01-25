@@ -1,6 +1,7 @@
 #include "terminal.h"
 #include "string.h"
 #include "pit.h"
+#include "utils.h"
 
 /*
 

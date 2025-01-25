@@ -17,7 +17,7 @@ CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o assemblyUtils.o pit.o math.o memory.o fail.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -27,6 +27,9 @@ all: $(ISO_IMAGE)
 
 
 boot.o: src/boot.s
+	$(AS) $< -o $@
+
+idtroutine.o: src/idtroutine.s
 	$(AS) $< -o $@
 
 # Compile the C code (with inline assembly)
@@ -45,13 +48,16 @@ math.o: src/math.cpp
 memory.o: src/memory.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-assemblyUtils.o: src/assemblyUtils.cpp
+utils.o: src/utils.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 pit.o: src/pit.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 fail.o: src/fail.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+idt.o: src/idt.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Link the kernel

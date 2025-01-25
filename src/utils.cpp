@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "terminal.h"
 
 /*
 
@@ -25,5 +26,19 @@ extern "C" {
 		uint8_t val;
 		__asm__ __volatile__ ("inb %1, %0" : "=a" (val) : "Nd" (port));
 		return val;
+	}
+	void induceHalt();
+	void induceHang() {
+		Terminal::print("\n\n( System hang induced. )\n");
+		cli();
+		while (true) {};
+		Terminal::print("\n\nSystem escaped from hang state, halting.");
+		induceHalt();
+	}
+	void induceHalt() {
+		Terminal::print("\n\n( System halted. )\n");
+		__asm__ __volatile__ ("hlt");
+		Terminal::print("\n\nSystem escaped from halt state, hanging.");
+		induceHang();
 	}
 }

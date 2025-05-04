@@ -1,7 +1,4 @@
-#define PIT_FREQUENCY 1193182.0
-
-#include "utils.h"
-
+#include "types.h"
 /*
 
 Copyright (C) 2024  XenithMusic (on github)
@@ -14,10 +11,8 @@ You should have received a copy of the GNU General Public License along with Par
 
 */
 
-
 extern "C" {
-	void set_pit_count(unsigned count);
-	unsigned get_pit_count(void);
-	double get_pit_seconds(void);
-	void sleep(double seconds);
+	void lidt(void* idt,size_t entries);
+	void encodeIDT(IDTEntry* idt, int index, struct IDTEntry entry);
+	void initIDT(IDTEntry* idt);
 }

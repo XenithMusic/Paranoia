@@ -23,7 +23,7 @@ You should have received a copy of the GNU General Public License along with Par
 #define BLOCK_SIZE 512 // 512B
 #define NUM_BLOCKS MEMORY_POOL_SIZE/BLOCK_SIZE // 512 MiB
 
-#define MEM_START (0x1*MEBIBYTES)
+#define MEM_START (0x2*MEBIBYTES)
 
 #if (NUM_BLOCKS%1) != 0
 #error "(-2032) NUM_BLOCKS should be an integer."

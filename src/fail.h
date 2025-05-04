@@ -14,6 +14,7 @@ You should have received a copy of the GNU General Public License along with Par
 
 
 void setError(int errno);
+void assert(bool dontcrash);
 int getError();
 void clearError();
 void fault(int errno,char* string);

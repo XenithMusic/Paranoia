@@ -10,7 +10,7 @@ with open("Makefile","r") as f:
 	data = f.read().split("\n")
 
 constants = {
-	"CONST_VERSION":"\"indev-2024-11-23\""
+	"CONST_VERSION":"\"indev-2025-01-24\""
 }
 
 # dynamic constants
@@ -28,4 +28,4 @@ constants = "CONST=\"" + escape_shell_string(constants) + "\""
 print("\n\n\nCONSTANTS:",constants,"\n\n\n")
 print()
 
-os.system(f"make -B {constants} && qemu-system-i386 -cdrom paranoia.iso -boot d")
+os.system(f"make -B {constants} && qemu-system-i386 -s -cdrom paranoia.iso -boot d")

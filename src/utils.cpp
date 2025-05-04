@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "terminal.h"
 
 /*
 
@@ -13,17 +14,40 @@ You should have received a copy of the GNU General Public License along with Par
 */
 
 extern "C" {
-	void cli() {
+	void cli() { // disable interrupts
 		__asm__ __volatile__ ("cli");
+	}
+
+	void sti() { // enable interrupts
+		__asm__ __volatile__ ("sti");
 	}
 
 	void outb(uint16_t port, uint8_t val) {
 		__asm__ __volatile__ ("outb %0, %1" : : "a" (val), "Nd" (port));
 	}
 
+	void io_wait() {
+		// dummy i/o operation
+		outb(0x80, 0);
+	}
+
 	uint8_t inb(uint16_t port) {
 		uint8_t val;
 		__asm__ __volatile__ ("inb %1, %0" : "=a" (val) : "Nd" (port));
 		return val;
+	}
+	void induceHalt();
+	void induceHang() {
+		Terminal::print("\n\n( System hang induced. )\n");
+		cli();
+		while (true) {};
+		Terminal::print("\n\nSystem escaped from hang state, halting.");
+		induceHalt();
+	}
+	void induceHalt() {
+		Terminal::print("\n\n( System halted. )\n");
+		__asm__ __volatile__ ("hlt");
+		Terminal::print("\n\nSystem escaped from halt state, hanging.");
+		induceHang();
 	}
 }

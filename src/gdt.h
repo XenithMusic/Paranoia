@@ -1,7 +1,4 @@
-#define PIT_FREQUENCY 1193182.0
-
-#include "utils.h"
-
+#include "types.h"
 /*
 
 Copyright (C) 2024  XenithMusic (on github)
@@ -13,11 +10,9 @@ Paranoia is distributed in the hope that it will be useful, but WITHOUT ANY WARR
 You should have received a copy of the GNU General Public License along with Paranoia. If not, see <https://www.gnu.org/licenses/>.
 
 */
-
-
 extern "C" {
-	void set_pit_count(unsigned count);
-	unsigned get_pit_count(void);
-	double get_pit_seconds(void);
-	void sleep(double seconds);
+    void setGDT(uint16_t limit, void* base);
+    void encodeGDT(int index, struct GDTEntry entry);
+    GDTPointer initGDT(GDTEntry* gdt);
+    void switchUserspace();
 }

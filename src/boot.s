@@ -87,6 +87,9 @@ _start:
     runtime support to work as well.
     */
 
+    xor %ebp, %ebp         // Set %ebp to NULL because if it's not null, a
+                           // stack trace will go forever.
+
     /*
     Enter the high-level kernel. The ABI requires the stack is 16-byte
     aligned at the time of the call instruction (which afterwards pushes

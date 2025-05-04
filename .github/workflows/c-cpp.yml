@@ -21,6 +21,8 @@ jobs:
       run: wget https://github.com/lordmilko/i686-elf-tools/releases/download/7.1.0/i686-elf-tools-linux.zip -O "tools.zip"
     - name: extract elf tools
       run: unzip ./tools.zip -d tools
+    - name: correcting makefile for local tools instance
+      run: python .github/workflows/fixmakefile.py
     - name: adding i686-elf-as alias
       run: alias i686-elf-as='tools/bin/i686-elf-as'
     - name: adding i686-elf-g++ alias

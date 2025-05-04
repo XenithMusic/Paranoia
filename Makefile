@@ -18,7 +18,7 @@ CFLAGS += $(CONST)
 # Output files
 KERNEL = bin/paranoia.bin
 OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o syscall.o
-ISO_IMAGE = paranoia.iso
+ISO_IMAGE = iso/paranoia.iso
 
 ISO_DIR = iso
 
@@ -85,4 +85,3 @@ $(ISO_IMAGE): $(KERNEL)
 # Clean the generated files
 clean:
 	rm -f $(OBJ_FILES) $(KERNEL)
-	rm paranoia.iso

@@ -17,10 +17,18 @@ jobs:
       run: sudo apt install python3 grub-pc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo libisl-dev
     # - name: configure
     #   run: ./configure
-    - name: clone i686-elf-tools
-      run: git clone https://github.com/lordmilko/i686-elf-tools
-    - name: build i686-elf-tools
-      run: cd i686-elf-tools && ./i686-elf-tools.sh linux
+    - name: download elf tools
+      run: wget https://github.com/lordmilko/i686-elf-tools/releases/download/7.1.0/i686-elf-tools-linux.zip -O "tools.zip"
+    - name: extract elf tools
+      run: unzip ./tools.zip -d tools
+    - name: adding i686-elf-as alias
+      run: alias i686-elf-as='tools/bin/i686-elf-as'
+    - name: adding i686-elf-g++ alias
+      run: alias i686-elf-as='tools/bin/i686-elf-g++'
+    - name: adding i686-elf-gcc alias
+      run: alias i686-elf-as='tools/bin/i686-elf-gcc'
+    - name: adding i686-elf-objcopy alias
+      run: alias i686-elf-as='tools/bin/i686-elf-objcopy'
     - name: build
       run: ./build
     - name: verify

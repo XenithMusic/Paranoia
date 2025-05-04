@@ -1,0 +1,9 @@
+{
+    "makefile.configureOnOpen": true,
+    "github.copilot.enable": {
+        "*": false,
+        "plaintext": false,
+        "markdown": false,
+        "scminput": false
+    }
+}

@@ -14,12 +14,21 @@ You should have received a copy of the GNU General Public License along with Par
 */
 
 extern "C" {
-	void cli() {
+	void cli() { // disable interrupts
 		__asm__ __volatile__ ("cli");
+	}
+
+	void sti() { // enable interrupts
+		__asm__ __volatile__ ("sti");
 	}
 
 	void outb(uint16_t port, uint8_t val) {
 		__asm__ __volatile__ ("outb %0, %1" : : "a" (val), "Nd" (port));
+	}
+
+	void io_wait() {
+		// dummy i/o operation
+		outb(0x80, 0);
 	}
 
 	uint8_t inb(uint16_t port) {

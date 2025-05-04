@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License along with Par
 #endif
 
 #ifndef CONST_AUTHOR
-#define CONST_AUTHOR "cookiiq (with help from OSDev.org and chatgpt)"
+#define CONST_AUTHOR "cookiiq (with help from OSDev.org, copilot and chatgpt)"
 #endif
 
 #ifndef CONST_KERNELSIZE

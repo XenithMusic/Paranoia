@@ -28,4 +28,4 @@ constants = "CONST=\"" + escape_shell_string(constants) + "\""
 print("\n\n\nCONSTANTS:",constants,"\n\n\n")
 print()
 
-os.system(f"make -B {constants} && qemu-system-i386 -cdrom paranoia.iso -boot d")
+os.system(f"make -B {constants} && qemu-system-i386 -s -cdrom paranoia.iso -boot d")

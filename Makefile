@@ -10,14 +10,14 @@ OBJCP = i686-elf-objcopy
 GRUB = grub-mkrescue
 
 # Flags for the compiler and linker
-CFLAGS = -ffreestanding -O2 -Wall -Wextra -fno-exceptions -fno-rtti
+CFLAGS = -ffreestanding -g -m32 -nostdlib -O2 -Wall -Wextra -fno-exceptions -fno-rtti
 LDFLAGS = -T linker.ld -ffreestanding -O2 -nostdlib -lgcc
 
 CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o syscall.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -58,6 +58,15 @@ fail.o: src/fail.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 idt.o: src/idt.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+isr.o: src/isr.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+gdt.o: src/gdt.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+syscall.o: src/syscall.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Link the kernel

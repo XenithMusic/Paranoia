@@ -1,5 +1,4 @@
-#include <stdint.h>
-
+#include "types.h"
 /*
 
 Copyright (C) 2024  XenithMusic (on github)
@@ -13,15 +12,7 @@ You should have received a copy of the GNU General Public License along with Par
 */
 
 extern "C" {
-	void cli();
-	void sti();
-	void io_wait();
-
-	void interrupt(uint8_t num);
-
-	void outb(uint16_t port, uint8_t val);
-	uint8_t inb(uint16_t port);
-
-	void induceHang();
-	void induceHalt();
+	void lidt(void* idt,size_t entries);
+	void encodeIDT(IDTEntry* idt, int index, struct IDTEntry entry);
+	void initIDT(IDTEntry* idt);
 }

@@ -1,5 +1,4 @@
-#include <stdint.h>
-
+#include "types.h"
 /*
 
 Copyright (C) 2024  XenithMusic (on github)
@@ -11,17 +10,9 @@ Paranoia is distributed in the hope that it will be useful, but WITHOUT ANY WARR
 You should have received a copy of the GNU General Public License along with Paranoia. If not, see <https://www.gnu.org/licenses/>.
 
 */
-
 extern "C" {
-	void cli();
-	void sti();
-	void io_wait();
-
-	void interrupt(uint8_t num);
-
-	void outb(uint16_t port, uint8_t val);
-	uint8_t inb(uint16_t port);
-
-	void induceHang();
-	void induceHalt();
+    void setGDT(uint16_t limit, void* base);
+    void encodeGDT(int index, struct GDTEntry entry);
+    GDTPointer initGDT(GDTEntry* gdt);
+    void switchUserspace();
 }

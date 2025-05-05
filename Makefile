@@ -17,7 +17,7 @@ CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o syscall.o driver_ps2ctl.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o syscall.o driver_ps2ctl.o pic.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -67,6 +67,9 @@ gdt.o: src/gdt.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 syscall.o: src/syscall.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+pic.o: src/pic.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 driver_ps2ctl.o: src/drivers/ps2.cpp

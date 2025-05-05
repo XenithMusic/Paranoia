@@ -174,7 +174,7 @@ namespace ps2ctl
         bool works = resetDevices();
         if (works) {
             Terminal::print("[  OK  ] PS/2 Driver Init\n");
-            Terminal::print("[PS2CTL] Identifying PS/2 device");
+            Terminal::print("[PS2CTL] Identifying PS/2 device\n");
 
             return true;
         } else {

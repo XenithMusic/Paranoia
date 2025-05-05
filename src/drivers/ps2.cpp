@@ -12,6 +12,12 @@ void out(bool isData, uint8_t data) {
     outb(port,data);
 }
 
+bool outack(bool isData, uint8_t data) {
+    out(isData,data);
+    uint8_t ack = inblocking(true);
+    return ack == 0xFA;
+}
+
 uint8_t in(bool isData) {
     uint16_t port = 0x64;
     if (isData) port = 0x60;
@@ -176,4 +182,13 @@ namespace ps2ctl
             return false;
         }
     }
+    /*
+    bool init_keyboard() {
+        if (outack(true,0xF4)) {
+            Terminal::print("[ INFO ] Keyboard ACK'd 0xF4"); // send 0xF4 on data 
+        } else {
+            Terminal::print("[ FAIL ] Keyboard did not ACK 0xF4; keyboard input may not work.");
+        }
+    }
+    */
 }

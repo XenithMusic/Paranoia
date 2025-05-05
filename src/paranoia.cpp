@@ -10,6 +10,10 @@
 #include "idt.h"
 #include "isr.h"
 
+// DRIVERS
+
+#include "drivers/ps2.h"
+
 /*
 
 Copyright (C) 2024  XenithMusic (on github)
@@ -78,7 +82,7 @@ extern "C" {
         set_pit_count(0);
 
         Terminal::print("[TIME UNKNOWN]");
-            Terminal::print(" PIT reset, time is measured since this message.\n");
+            Terminal::print(" PIT reset, time is measured in seconds since this message.");
             Terminal::print("\n");
 
         // Post-terminal init
@@ -87,7 +91,16 @@ extern "C" {
 
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] IDT initialized.\n");
+            Terminal::print("] IDT initialized.");
+            Terminal::print("\n");
+        Terminal::print("[");
+            Terminal::print(parseDouble(get_pit_seconds(),str,10));
+            Terminal::print("] Initializing Drivers...");
+            Terminal::print("\n");
+        ps2ctl::init();
+        Terminal::print("[");
+            Terminal::print(parseDouble(get_pit_seconds(),str,10));
+            Terminal::print("] Initialized PS/2 Driver.");
             Terminal::print("\n");
 
         Terminal::print("System information:\n");

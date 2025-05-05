@@ -10,15 +10,15 @@ OBJCP = i686-elf-objcopy
 GRUB = grub-mkrescue
 
 # Flags for the compiler and linker
-CFLAGS = -ffreestanding -g -m32 -nostdlib -O2 -Wall -Wextra -fno-exceptions -fno-rtti
-LDFLAGS = -T linker.ld -ffreestanding -O2 -nostdlib -lgcc
+CFLAGS = -ffreestanding -g -m32 -nostdlib -O2 -Wall -Wextra -fno-exceptions -fno-rtti -Isrc/
+LDFLAGS = -T linker.ld -ffreestanding -O2 -nostdlib -lgcc -Isrc/
 
 CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o syscall.o
-ISO_IMAGE = iso/paranoia.iso
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o syscall.o driver_ps2ctl.o
+ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
 
@@ -69,6 +69,9 @@ gdt.o: src/gdt.cpp
 syscall.o: src/syscall.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
+driver_ps2ctl.o: src/drivers/ps2.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Link the kernel
 $(KERNEL): $(OBJ_FILES)
 	$(LD) $(LDFLAGS) -o $(KERNEL) $(OBJ_FILES)
@@ -79,8 +82,9 @@ $(KERNEL): $(OBJ_FILES)
 $(ISO_IMAGE): $(KERNEL)
 	mkdir -p $(ISO_DIR)/boot/grub
 	cp $(KERNEL) $(ISO_DIR)/boot/
-
+	cd iso
 	$(GRUB) -o $(ISO_IMAGE) $(ISO_DIR)
+	cd ..
 
 # Clean the generated files
 clean:

@@ -186,6 +186,14 @@ struct stackframe {
     uint32_t eip;
 };
 
+struct RSDPDescriptor {
+	char signature[8];		// "RSD PTR "
+	uint8_t checksum;		// Entire struct must sum to 0
+	char oem_id[6];
+	uint8_t revision;		// 0 = ACPI 1.0
+	uint32_t rsdt_address;	// 32-bit physical address of RSDT
+} __attribute__((packed));
+
 // 0000
 
 // 0000, 0000, 00, 00, 00, 00

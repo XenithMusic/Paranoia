@@ -70,7 +70,7 @@ extern "C" {
 			encodeIDT(idt,vec,(void*)&exception_handler,0x8e);
 		}
 		encodeIDT(idt,0x00,(void*)&divzero_handler,0x8e);
-		encodeIDT(idt,0x21,(void*)&exception_handler,0x8e);
+		encodeIDT(idt,0x21,(void*)&irq1_handler,0x8e);
 		lidt(idt);
 		sti();
 	}

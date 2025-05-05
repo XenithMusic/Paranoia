@@ -24,6 +24,10 @@ extern "C" {
         fault(1,"Division by Zero");
         eoi();
     }
+    void irq1_handler() {
+        fault(1,"IRQ1 demo testing");
+        eoi();
+    }
     void syscall() {
         int syscall_num;
         int arg1, arg2, arg3;

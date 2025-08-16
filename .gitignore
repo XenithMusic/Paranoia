@@ -3,4 +3,4 @@
 *.log
 *.o
 *.code-workspace
-.vscode/*
+.vscode/

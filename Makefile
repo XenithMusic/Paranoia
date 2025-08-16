@@ -3,10 +3,10 @@
 CONST = # Constants
 
 # Paths to tools
-AS = i686-elf-as
-CC = i686-elf-g++
-LD = i686-elf-gcc
-OBJCP = i686-elf-objcopy
+AS = i386-elf-as
+CC = i386-elf-g++
+LD = i386-elf-gcc
+OBJCP = i386-elf-objcopy
 GRUB = grub-mkrescue
 
 # Flags for the compiler and linker
@@ -17,7 +17,7 @@ CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o syscall.o driver_ps2ctl.o pic.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o isras.o syscall.o driver_ps2ctl.o pic.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -30,6 +30,9 @@ boot.o: src/boot.s
 	$(AS) $< -o $@
 
 idtroutine.o: src/idtroutine.s
+	$(AS) $< -o $@
+
+isras.o: src/isr.s
 	$(AS) $< -o $@
 
 # Compile the C code (with inline assembly)

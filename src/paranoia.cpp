@@ -65,8 +65,6 @@ extern "C" {
 
         Allocator::init();
 
-        // fault(69420,"On-boot FAULT test.");
-
         // Backlog of pre-terminal init
         Terminal::init();
         Terminal::print("[TIME UNKNOWN]");
@@ -97,51 +95,85 @@ extern "C" {
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Initializing Drivers...");
             Terminal::print("\n");
-        ps2ctl::init();
+        PS2Returns response = ps2general::init();
+        if (response != Success) {
+    //             NoPS2Controller,
+    // PS2Timeout,
+    // SelfTestFailure,
+    // NoWorkingPorts,
+    // Success,
+    // NoAck,
+            if (response == NoPS2Controller) {
+                fault(-401,"No PS/2 controller found.)");
+            } else if (response == PS2Timeout) {
+                fault(-401,"Timed out while waiting for a response.");
+            } else if (response == SelfTestFailure) {
+                fault(-401,"PS/2 Controller reported a failure during self-test.");
+            } else if (response == NoWorkingPorts) {
+                fault(-401,"PS/2 Controller has no working ports.");
+            } else {
+                fault(-401);
+            }
+        }
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Initialized PS/2 Driver.");
             Terminal::print("\n");
+        response = ps2keyboard::init(false);
+        if (response != Success) {
+            if (response == PS2Timeout) {
+                fault(-402,"Timed out while waiting for a response.");
+            } else if (response == NoAck) {
+                fault(-402,"Something should've been acknowledged, but wasn't.");
+            } else {
+                fault(-402);
+            }
+        }
+        Terminal::print("[");
+            Terminal::print(parseDouble(get_pit_seconds(),str,10));
+            Terminal::print("] Initialized PS/2 Keyboard.");
+            Terminal::print("\n");
 
-        Terminal::print("System information:\n");
-        Terminal::print("KERNEL:             PARANOIA\n");
-        Terminal::print("- VERSION:            ");
-            Terminal::print(CONST_VERSION);
-            Terminal::print("\n");
-        Terminal::print("- COMPILATION DATE:   ");
-            Terminal::print(CONST_COMPDATE);
-            Terminal::print("\n");
-        Terminal::print("- AUTHORED BY:        ");
-            Terminal::print(CONST_AUTHOR);
-            Terminal::print("\n");
-        Terminal::print("- KERNEL SIZE:        ");
-            Terminal::print(parseDouble((double)CONST_KERNELSIZE/4/1024,str,2));
-            Terminal::print("MiB\n");
+        // Terminal::print("System information:\n");
+        // Terminal::print("KERNEL:             PARANOIA\n");
+        // Terminal::print("- VERSION:            ");
+        //     Terminal::print(CONST_VERSION);
+        //     Terminal::print("\n");
+        // Terminal::print("- COMPILATION DATE:   ");
+        //     Terminal::print(CONST_COMPDATE);
+        //     Terminal::print("\n");
+        // Terminal::print("- AUTHORED BY:        ");
+        //     Terminal::print(CONST_AUTHOR);
+        //     Terminal::print("\n");
+        // Terminal::print("- KERNEL SIZE:        ");
+        //     Terminal::print(parseDouble((double)CONST_KERNELSIZE/4/1024,str,2));
+        //     Terminal::print("MiB\n");
         
-        // You can add more setup here (keyboard, time, etc.)
+        // // You can add more setup here (keyboard, time, etc.)
 
-        // approx. 0.0000326 seconds per print instruction
-        Terminal::print(parseDouble(get_pit_seconds(),str,10));
-        Terminal::print(" first call\n");
-        Terminal::print(parseDouble(get_pit_seconds(),str,10));
-        Terminal::print(" second call\n");
-        Terminal::print(parseDouble(get_pit_seconds(),str,10));
-        Terminal::print(" third call\n");
-        Terminal::print(parseDouble(get_pit_seconds(),str,10));
-        Terminal::print(" fourth call\n");
+        // // approx. 0.0000326 seconds per print instruction
+        // Terminal::print(parseDouble(get_pit_seconds(),str,10));
+        // Terminal::print(" first call\n");
+        // Terminal::print(parseDouble(get_pit_seconds(),str,10));
+        // Terminal::print(" second call\n");
+        // Terminal::print(parseDouble(get_pit_seconds(),str,10));
+        // Terminal::print(" third call\n");
+        // Terminal::print(parseDouble(get_pit_seconds(),str,10));
+        // Terminal::print(" fourth call\n");
 
         double lastTick;
         double tick;
 
         while (1) {
-
             tick = get_pit_seconds();
 
             if (lastTick+1 < tick) {
                 lastTick = tick;
-                Terminal::print(parseDouble(tick,str,10));
-                Terminal::print("\n");
+                // Terminal::print(parseDouble(tick,str,10));
+                // Terminal::print("\n");
             }
+            if (ps2keyboard::state.state == EatingScancode)
+                ps2keyboard::processScancodes();
             // The OS runs here
             // Terminal::swapBuffers();
         }

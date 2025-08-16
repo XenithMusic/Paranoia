@@ -4,7 +4,7 @@ def escape_shell_string(input_str):
     # Escape single quotes and double quotes by adding backslashes
     return input_str.replace('"', '\\"')
 
-# os.system(f"make -Bs")
+os.system(f"make -Bs")
 
 with open("Makefile","r") as f:
 	data = f.read().split("\n")
@@ -28,4 +28,4 @@ constants = "CONST=\"" + escape_shell_string(constants) + "\""
 print("\n\n\nCONSTANTS:",constants,"\n\n\n")
 print()
 
-os.system(f"make -B {constants} && qemu-system-i386 -s -cdrom paranoia.iso -boot d")
+os.system(f"make -B {constants} && qemu-system-i386 -s -cdrom paranoia.iso -boot d ")

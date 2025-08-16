@@ -53,6 +53,21 @@ enum vga_color {
     VGA_COLOR_WHITE = 15,
 };
 
+
+enum PS2_STATES {
+    NoProcess,
+    EnablingScanning,
+    WaitingForScancodes,
+    EatingScancode,
+};
+
+struct ps2stateMachine {
+    PS2_STATES state = NoProcess;
+    uint8_t data1 = 0x00;
+    uint8_t data2 = 0x00;
+};
+
+
 enum syscall_fail {
     SCFAIL_FAULT_FAILURE = 1000,
 
@@ -93,7 +108,7 @@ enum syscall_fail {
     SCFAIL_POINTER_UNSAFEMEMORY = -2030,
     SCFAIL_POINTER_UNALLOCATED = -2031,
     INTERNAL_NUMBLOCKS_BADINT = -2032,
-    INTERNAL_KERNELSIZE_OUT_OF_MEMORY = -2033
+    INTERNAL_KERNELSIZE_OUT_OF_MEMORY = -2033,
 };
 
 enum syscall_id {
@@ -145,6 +160,22 @@ enum syscall_id {
     SCALL_SHUTDOWN = 901, // EC
     SCALL_RESTART = 902, // EC
     SCALL_SUSPEND = 903 // EC
+};
+
+enum ps2device {
+    ANCIENT = 0, // Ancient AT Keyboard
+    PS2MOUSE = 1, // Standard PS/2 Mouse
+    SCROLLMOUSE = 2, // Mouse with scroll wheel
+    FIVEBTNMOUSE = 3, // 5 Button Mouse
+    MF2KEYBOARD = 4, // MF2 Keyboard
+    SHORTKEYBOARD = 5, // IBM Thinkpads, Spacesaver keyboards, Many other "short" keyboards
+    NCDN97KEYBOARD = 6, // NCD N-97 KEYBOARD
+    HOST122KEYBOARD = 7, // 122-Key Host Connected Keyboard
+    KEY122KEYBOARD = 8, // 122-Key Keyboard
+    JPKEYBOARD_G = 9, // Japanese "G" Keyboard
+    JPKEYBOARD_P = 10, // Japanese "P" Keyboard
+    JPKEYBOARD_A = 11, // Japanese "A" Keeyboard
+    NCDSUNKEYBOARD = 12, // NCD Sun Layout Keyboard
 };
 
 // struct GDT {

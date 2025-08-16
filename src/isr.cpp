@@ -1,7 +1,9 @@
 #include <stdint.h>
 #include "fail.h" // Include the fail.h header
 #include "utils.h"
+#include "types.h"
 #include "syscall.h"
+#include "drivers/ps2.h"
 
 #define PIC1		0x20		/* IO base address for master PIC */
 #define PIC2		0xA0		/* IO base address for slave PIC */
@@ -12,21 +14,52 @@
 
 // Simple ISR for handling exceptions
 extern "C" {
-    void eoi() {
-        outb(PIC1_COMMAND, 0x20); // Acknowledge the master PIC
-        outb(PIC2_COMMAND, 0x20); // Acknowledge the slave PIC
+    void beginInterrupt() {
+
     }
-    void exception_handler() {
-        fault(10000,"Generic Exception Handler ISR");
-        eoi();
+    void endInterrupt() {
+
+    }
+    volatile void eoi(uint8_t irq) {
+        if (irq >= 8) {
+            outb(PIC2_COMMAND,0x20);
+        }
+        outb(PIC1_COMMAND, 0x20);
+    }
+    void exception_handler(uint32_t int_no, uint32_t err_code) {
+        fault(int_no,"Generic Exception Handler ISR");
+        // eoi(); DO NOT CALL EOI HERE; CPU EXCEPT
     }
     void divzero_handler() {
         fault(1,"Division by Zero");
-        eoi();
+        // eoi(); DO NOT CALL EOI HERE; CPU EXCEPT
     }
+    void genprotfault_handler() {
+        fault(1, "General Protection Fault");
+    }
+    void basic_eoi_assembly_low();
+    void basic_eoi_assembly_high();
+    void irq1_assembly();
     void irq1_handler() {
-        fault(1,"IRQ1 demo testing");
-        eoi();
+        volatile uint8_t scancode = inb(0x60);
+        eoi(1);
+        if (ps2keyboard::state.state == EnablingScanning) {
+            ps2keyboard::state.state = NoProcess;
+            ps2keyboard::state.data1 = scancode;
+        } else if (ps2keyboard::state.state == WaitingForScancodes) {
+            ps2keyboard::state.state = EatingScancode;
+            ps2keyboard::state.data1 = scancode;
+        } else if (ps2keyboard::state.state == EatingScancode) {
+            if (ps2keyboard::state.data2 == 0x00) {
+                ps2keyboard::state.data2 = scancode; // Queue up an extra scancode
+            }
+        }
+    }
+    void basic_eoi_handler_low() {
+        eoi(1);
+    }
+    void basic_eoi_handler_high() {
+        eoi(9);
     }
     void syscall() {
         int syscall_num;
@@ -46,7 +79,7 @@ extern "C" {
         // Handle system calls here
         handleSyscall((enum syscall_id)syscall_num, arg1, arg2, arg3);
         // For now, just acknowledge the interrupt
-        eoi();
+        // eoi(); DO NOT CALL EOI HERE; SOFTWARE INTERRUPT
         return;
     }
 	void syscall_c(int id,int arg1,int arg2,int arg3) {

@@ -22,6 +22,18 @@ extern "C" {
 		__asm__ __volatile__ ("sti");
 	}
 
+	bool checkInterrupts() {
+		uint32_t flags;
+		asm volatile (
+			"pushf\n\t"    // push EFLAGS onto stack
+			"pop %0"       // pop into flags variable
+			: "=r"(flags)  // output
+			:              // no input
+			:              // no clobbers
+		);
+		return (flags & (1 << 9)) > 0;
+	}
+
 	void outb(uint16_t port, uint8_t val) {
 		__asm__ __volatile__ ("outb %0, %1" : : "a" (val), "Nd" (port));
 	}
@@ -29,6 +41,15 @@ extern "C" {
 	void io_wait() {
 		// dummy i/o operation
 		outb(0x80, 0);
+	}
+
+	void interrupt(uint8_t vector) {
+		switch (vector) {
+			case 0x20: __asm__ __volatile__("int $0x20"); break;
+			case 0x21: __asm__ __volatile__("int $0x21"); break;
+			case 0x80: __asm__ __volatile__("int $0x80"); break;
+			default: /* unsupported */ break;
+		}
 	}
 
 	uint8_t inb(uint16_t port) {

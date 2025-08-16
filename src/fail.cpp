@@ -122,6 +122,21 @@ void fault(int errno,char* string) {
 		Terminal::print("  Something happened that guarantees that the IDT is not working, such as a \n");
 		Terminal::print("  guaranteed interrupt not occurring.");
 	}
+	if (errno == -400) {
+		Terminal::print("  Driver failure. (not specified)\n\n");
+
+		Terminal::print("  Something went wrong in a driver!");
+	}
+	if (errno == -401) {
+		Terminal::print("  Driver failure. (ps2general)\n\n");
+
+		Terminal::print("  The PS/2 Controller driver failed to perform a task.");
+	}
+	if (errno == -402) {
+		Terminal::print("  Driver failure. (ps2keyboard)\n\n");
+
+		Terminal::print("  The PS/2 Keyboard driver failed to perform a task.");
+	}
 	setError(1000);
 }
 

@@ -1,194 +1,278 @@
+#include <stdint.h>
 #include "utils.h"
 #include "fail.h"
-#include "terminal.h"
 #include "string.h"
+enum PS2Returns {
+    NoPS2Controller,
+    PS2Timeout,
+    SelfTestFailure,
+    NoWorkingPorts,
+    Success,
+    NoAck,
+    UnexpectedState,
+};
 
-// DATA PORT: 0x60
-// COMMAND PORT: 0x64
+namespace ps2general {
+    const uint8_t COMMAND_PORT = 0x64;
+    const uint8_t DATA_PORT = 0x60;
+    const uint8_t DISABLE_PORT_1 = 0xAD;
+    const uint8_t ENABLE_PORT_1 = 0xAE;
 
-void out(bool isData, uint8_t data) {
-    uint16_t port = 0x64;
-    if (isData) port = 0x60;
-    outb(port,data);
-}
+    const uint8_t DISABLE_PORT_2 = 0xA7;
+    const uint8_t ENABLE_PORT_2 = 0xA8;
 
-bool outack(bool isData, uint8_t data) {
-    out(isData,data);
-    uint8_t ack = inblocking(true);
-    return ack == 0xFA;
-}
+    const uint8_t READ_CONFIG_BYTE = 0x20;
+    const uint8_t WRITE_CONFIG_BYTE = 0x20;
 
-uint8_t in(bool isData) {
-    uint16_t port = 0x64;
-    if (isData) port = 0x60;
-    return inb(port);
-}
+    const uint8_t SELF_TEST = 0xAA;
+    const uint8_t TEST_PORT_1 = 0xAB;
+    const uint8_t TEST_PORT_2 = 0xA9;
 
-uint8_t inblocking(bool isData) {
-    while ((inb(0x64) & 0x01) == 0);
-    return in(isData);
-}
+    const uint8_t RESET_PORT_1 = 0xFF;
 
-void flushOutBuf() {
-    while (inb(0x64) & 1)
-        inb(0x60);
-    io_wait();
-}
+    const uint8_t BEGIN_DEVICE_COMMAND = 0xD4;
 
-void disableDevices() {
-    out(false,0xAD);
-    io_wait();
-    out(false,0xA7);
-    io_wait();
-}
+    const uint8_t ACK = 0xFA;
+    const uint8_t TIMEOUT_PSEUDO = 0x00;
 
-uint8_t readConfig() {
-    out(false,0x20);
-    io_wait();
-    return in(true);
-}
-
-void loadConfig(uint8_t data) {
-    out(false,0x60);
-    while (in(false) & 0x02 == 0);
-    out(true,data);
-}
-
-uint8_t maskConfig(uint8_t keepOn, uint8_t turnOn) {
-    // 0 bits in keepOn will be set to 0, 1 bits in turnOn will be set to 1.
-    uint8_t config = readConfig();
-    config = config & keepOn | turnOn;
-    loadConfig(config);
-    return config;
-}
-
-bool doesPS2Exist() {
-    return true; // TODO: actual proper checks
-}
-
-bool selfTest() {
-    out(false,0xAA);
-    io_wait();
-    return in(true) == 0x55;
-}
-
-bool hasChannel2() {
-    out(false,0xA8); // enable second PS/2 port
-    io_wait();
-    bool response = readConfig() && 0b00001 == 0;
-    if (response) {
-        out(false,0xA7);
-        maskConfig(0b101110111,0);
+    bool verifyPS2Controller() {
+        return true; // TODO: HACK: VERY BAD PRACTICE. CHANGE THIS AS SOON AS POSSIBLE.
+                     //             DO NOT ASSUME PS/2 CONTROLLER. MY HOSTCOMPUTER DOES NOT HAVE PS/2, AND WILL CRASH.
     }
-    return response;
-}
-
-uint8_t testInterfaces(bool channel2Exists) {
-    uint8_t ret = 0;
-    out(false,0xAB);
-    io_wait();
-    bool portOne = in(true);
-    bool portTwo = false;
-    if (portOne == 0x00) {
-        ret |= 0b00000001;
-        Terminal::print("[  OK  ] PS/2 Port 1 Test\n");
-    } else {
-        Terminal::print("[ FAIL ] PS/2 Port 1 Test\n");
+    void sendCommand(uint8_t command) {
+        outb(COMMAND_PORT,command);
     }
-    if (channel2Exists) {
-        out(false,0xA9);
+    void sendData(uint8_t data) {
+        outb(DATA_PORT,data);
+    }
+    uint8_t readStatusRegister() {
+        return inb(COMMAND_PORT);
+    }
+    bool waitForReadReady(int timeout) {
+        timeout *= 10;
+        while ((readStatusRegister() & 0b00000001) == 0) {
+            if (timeout != -10) {
+                timeout--;
+                if (timeout == 0) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    bool waitForWriteReady(int timeout) {
+        timeout *= 10;
+        while ((readStatusRegister() & 0b00000010) == 0) {
+            if (timeout != -10) {
+                timeout--;
+                if (timeout == 0) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    void sendCommand16(uint8_t first, uint8_t second) {
+        sendCommand(first);
+        while ((readStatusRegister() & 0b00000010) != 0) {}
+        sendData(second);
+    }
+    uint8_t sendCommandAck(uint8_t command) {
+        sendCommand(command);
+        if (waitForReadReady(1000) == false) {
+            return TIMEOUT_PSEUDO;
+        }
+        uint8_t ack = inb(0x60);
+        return ack;
+    }
+    uint8_t sendDataAck(uint8_t data) {
+        sendData(data);
+        if (waitForReadReady(1000) == false) {
+            return TIMEOUT_PSEUDO;
+        }
+        uint8_t ack = inb(0x60);
+        return ack;
+    }
+    uint8_t fetchConfigurationByte() {
+        outb(COMMAND_PORT,READ_CONFIG_BYTE);
+        if (waitForReadReady(1000) == false) return TIMEOUT_PSEUDO;
+        return inb(DATA_PORT);
+    }
+    PS2Returns init() {
+        cli();
+        if (not verifyPS2Controller()) {
+            return NoPS2Controller;
+        }
+
+        // DISABLE PORTS
+
+        sendCommand(DISABLE_PORT_1);
         io_wait();
-        portTwo = in(true);
-        if (portTwo == 0x00) {
-            ret |= 0b00000010;
-            Terminal::print("[  OK  ] PS/2 Port 2 Test\n");
-        } else {
-            Terminal::print("[ FAIL ] PS/2 Port 2 Test\n");
+        sendCommand(DISABLE_PORT_2);
+
+        // FLUSH PORT 0x60
+
+        inb(DATA_PORT);
+ // IRQ8 to 15
+        // UPDATE CONFIGURATION
+
+        uint8_t config = fetchConfigurationByte();
+
+        if (config == TIMEOUT_PSEUDO) {
+            return PS2Timeout;
         }
+
+        config &= 0b10000100; // clear bits 0, 4, and 6 -- WRONG, CLEAR 0, 1, 4, and 6 (0b01101011)
+
+        sendCommand16(WRITE_CONFIG_BYTE,config);
+
+        // SELF TEST
+
+        sendCommand(SELF_TEST);
+        if (not waitForReadReady(10000)) {
+            return PS2Timeout;
+        }
+        uint8_t result = inb(DATA_PORT);
+        if (result != 0x55) {
+            return SelfTestFailure;
+        }
+
+        sendCommand16(WRITE_CONFIG_BYTE,config); // fix the configuration because sometimes selftest resets the config
+
+        // CHECK FOR DUAL CHANNEL
+
+        sendCommand(ENABLE_PORT_2);
+        config = fetchConfigurationByte();
+        bool dualChannel = false;
+        if (config & 0b00010000 == 0) {
+            dualChannel = true;
+            sendCommand(DISABLE_PORT_2);
+        }
+
+        // TEST PORTS
+
+        bool portOneWorking = false;
+        bool portTwoWorking = false;
+        sendCommand(TEST_PORT_1);
+        if (not waitForReadReady(10000)) {
+            return PS2Timeout;
+        }
+        result = inb(DATA_PORT);
+        if (result == 0x00) portOneWorking = true;
+
+
+
+        sendCommand(TEST_PORT_2);
+        if (not waitForReadReady(10000)) {
+            return PS2Timeout;
+        }
+        result = inb(DATA_PORT);
+        if (result == 0x00) portTwoWorking = true;
+
+        if (not (portOneWorking or portTwoWorking)) {
+            return NoWorkingPorts;
+        }
+
+        // Enable working ports, and their IRQs.
+
+        config = fetchConfigurationByte();
+
+        if (portOneWorking) {
+            Terminal::print("Enabled port one.\n");
+            sendCommand(ENABLE_PORT_1);
+            config |= 0b00010001;
+        }
+        if (portTwoWorking) {
+            Terminal::print("Enabled port two.\n");
+            sendCommand(ENABLE_PORT_2);
+            config |= 0b00100010;
+        }
+
+        sendCommand16(WRITE_CONFIG_BYTE,config); // update the IRQs in the config
+
+        uint8_t responses[2] = {};
+        bool portOnePopulated = true;
+        bool portTwoPopulated = true;
+        uint8_t portOneID = 0x00;
+        uint8_t portTwoID = 0x00;
+        if (portOneWorking) {
+            sendCommand(RESET_PORT_1);
+            if (not waitForReadReady(10000)) {
+                portOnePopulated = false;
+            } else {
+                responses[1] = inb(DATA_PORT);
+                if (responses[1] == 0xFC) {
+                    portOnePopulated = false;
+                    portOneWorking = false;
+                } else {
+                    if (not waitForReadReady(30000)) {
+                        portOnePopulated = false;
+                        portOneWorking = false;
+                        // unexpected; it was working before
+                    }
+                    responses[2] = inb(DATA_PORT);
+                }
+            }
+            if (portOneWorking and portOnePopulated) {
+                if ((responses[0] == 0xFA and responses[1] == 0xAA) or 
+                    (responses[0] == 0xAA and responses[1] == 0xFA)) {
+                        if (not waitForReadReady(30000)) {
+                            portOnePopulated = false;
+                            portOneWorking = false;
+                        } else {
+                            portOneID = inb(DATA_PORT);
+                        }
+                    } 
+            }
+        }
+
+        return Success;
     }
-    return ret;
 }
 
-char* ps2kbstr; // pointer if anything demands a pointer
-bool resetDevices() {
-    bool hasAA = false;
-    bool hasFA = false;
-    uint8_t data;
-    out(true,0xFF);
-    data = inblocking(true);
-    Terminal::print("DATA1: 0x");
-    parseDouble((double)data,ps2kbstr,16);
-    Terminal::print(ps2kbstr);
-    Terminal::print("\n");
-    if (data == 0xAA) { hasAA = true; } else if (data == 0xFA) { hasFA = true; };
-    if (data == 0xFC) {
-        Terminal::print("[ FAIL ] Devices failed to reset; self-test failure. \n");
-        return false;
-    }
-    data = inblocking(true);
-    Terminal::print("DATA2: 0x");
-    parseDouble((double)data,ps2kbstr,16);
-    Terminal::print(ps2kbstr);
-    Terminal::print("\n");
-    if (data == 0xAA) { hasAA = true; } else if (data == 0xFA) { hasFA = true; };
-    if (hasAA) {
-        Terminal::print("[  OK  ] Has AA\n");
-    } else {
-        Terminal::print("[ FAIL ] Doesn't have AA\n");
-    }
-    if (hasFA) {
-        Terminal::print("[  OK  ] Has FA\n");
-    } else {
-        Terminal::print("[ FAIL ] Doesn't have FA\n");
-    }
-    return hasAA and hasFA;
-}
+namespace ps2keyboard {
 
-namespace ps2ctl
-{
-    bool init() {
-        // disable devices
-        disableDevices();
-        flushOutBuf();
-        uint8_t config = maskConfig(0b00100110,0); // 0b01100100
-        bool test = selfTest();
-        if (!test) {
-            Terminal::print("[ FAIL ] PS/2 Controller Self-Test\n");
-        } else {
-            Terminal::print("[  OK  ] PS/2 Controller Self-Test\n");
-        }
-        loadConfig(config); // do this again because sometimes the self test resets the PS/2 controller
-        bool ch2 = hasChannel2();
-        if (ch2) {
-            Terminal::print("[ INFO ] PS/2 Controller has second port.\n");
-        }
-        uint8_t workingPorts = testInterfaces(ch2);
-        if (workingPorts & 0b00000001 == 1) {
-            out(false,0xAE); // enable port 1
-            config = maskConfig(0b11111111,0b00000001);
-        }
-        if (ch2 and workingPorts & 0b00000010 == 1) {
-            out(false,0xA8); // enable port 2
-            config = maskConfig(0b11111111,0b00000010);
-        }
-        bool works = resetDevices();
-        if (works) {
-            Terminal::print("[  OK  ] PS/2 Driver Init\n");
-            Terminal::print("[PS2CTL] Identifying PS/2 device\n");
+    const uint8_t ENABLE_SCANNING = 0xF4;
+    ps2stateMachine state; // state machine
 
-            return true;
-        } else {
-            Terminal::print("[ FAIL ] PS/2 Driver\n");
-            return false;
+    PS2Returns init(bool portTwo) {
+        if (portTwo == false) {
+            state.state = EnablingScanning;
+            while (inb(0x64) & 1) inb(0x60); // flush the buffer
+            ps2general::sendData(ENABLE_SCANNING);
+            sti();
+            uint8_t timeout = 100000;
+            while (state.state == EnablingScanning) {
+                timeout--;
+                if (timeout <= 0) {
+                    break;
+                }
+            }
+            if (state.state == NoProcess) {
+                // we recieved data!
+                if (state.data1 == ps2general::ACK) {
+                    Terminal::print("acked\n");
+                    state.state = WaitingForScancodes;
+                    
+                    return Success;
+                }
+                return NoAck;
+            } else if (state.state == EnablingScanning) {
+                return PS2Timeout;
+            }
+            return UnexpectedState;
         }
     }
-    /*
-    bool init_keyboard() {
-        if (outack(true,0xF4)) {
-            Terminal::print("[ INFO ] Keyboard ACK'd 0xF4"); // send 0xF4 on data 
-        } else {
-            Terminal::print("[ FAIL ] Keyboard did not ACK 0xF4; keyboard input may not work.");
+
+    PS2Returns processScancodes() {
+        if (state.state == EatingScancode) {
+            Terminal::print("Scancode!");
+            state.data1 = state.data2;
+            state.data2 = 0x00;
+            if (state.data1 == 0x00) {
+                state.state = WaitingForScancodes;
+            }
         }
+        return Success;
     }
-    */
 }

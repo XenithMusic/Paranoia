@@ -42,8 +42,12 @@ extern "C" {
 		outb(PIC1_DATA, 0x01); // set 8086/88 (MCS-80/85) mode
 		outb(PIC2_DATA, 0x01);
 		// optionally, clear data registers (mask all IRQs for now)
-		outb(PIC1_DATA, 0x0);
-		outb(PIC2_DATA, 0x0);
+		// doing this manually lol
+		uint8_t PIC1_IRQ_MASK = ~0b00000010;
+		// PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
+		uint8_t PIC2_IRQ_MASK = ~0b00000010;
+		outb(PIC1_DATA, PIC1_IRQ_MASK);
+		outb(PIC2_DATA, PIC2_IRQ_MASK);
 	}
 	void catchAll() { // generic thing to see if any interrupts occur (do not replace)
 		while (1) __asm__ __volatile__ ("hlt");
@@ -70,7 +74,23 @@ extern "C" {
 			encodeIDT(idt,vec,(void*)&exception_handler,0x8e);
 		}
 		encodeIDT(idt,0x00,(void*)&divzero_handler,0x8e);
-		encodeIDT(idt,0x21,(void*)&irq1_handler,0x8e);
+		encodeIDT(idt,0x0d,(void*)&genprotfault_handler,0x8e);
+		encodeIDT(idt,0x20,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x21,(void*)&irq1_assembly,0x8e);
+		encodeIDT(idt,0x22,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x23,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x24,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x25,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x26,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x27,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x28,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x29,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2a,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2b,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2c,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2d,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2e,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2f,(void*)&basic_eoi_assembly_high,0x8e);
 		lidt(idt);
 		sti();
 	}

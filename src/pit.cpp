@@ -21,16 +21,22 @@ extern "C" {
 	void set_pit_count(int count) {
 		overflowCount = 0;
 		previous_count = count%65536;
+		bool interruptsEnabled = checkInterrupts();
 		// Disable interrupts
 		cli();
 		
 		// Set low byte
 		outb(0x40,count&0xFF);		// Low byte
 		outb(0x40,(count&0xFF00)>>8);	// High byte
+
+		if (interruptsEnabled)
+			sti();
 		return;
 	}
 	uint64_t get_pit_count(void) {
 		unsigned count = 0;
+		
+		bool interruptsEnabled = checkInterrupts();
 		
 		// Disable interrupts
 		cli();
@@ -47,6 +53,9 @@ extern "C" {
 			overflowCount++;
 		}
 		previous_count = count;
+
+		if (interruptsEnabled)
+			sti();
 		
 		return count+(overflowCount*65536);
 	}

@@ -15,12 +15,15 @@ You should have received a copy of the GNU General Public License along with Par
 extern "C" {
 	void cli();
 	void sti();
+	bool checkInterrupts();
 	void io_wait();
 
 	void interrupt(uint8_t num);
 
 	void outb(uint16_t port, uint8_t val);
 	uint8_t inb(uint16_t port);
+
+	void interrupt(uint8_t vector);
 
 	void induceHang();
 	void induceHalt();

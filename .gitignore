@@ -2,3 +2,5 @@
 *.iso
 *.log
 *.o
+*.code-workspace
+.vscode/*

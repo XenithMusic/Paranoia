@@ -65,6 +65,7 @@ extern "C" {
 
         if (num == 0) {
             str[i++] = '0';
+            str[i++] = '\0';
         } else {
             // Only add negative sign if the number is negative and base is 10
             if (num < 0 and base == 10) {
@@ -79,8 +80,6 @@ extern "C" {
                 num /= base;
             }
 
-            str[j] = '\0';
-
             // Reverse the string
             int start = i;
             int end = j - 1;
@@ -91,6 +90,7 @@ extern "C" {
                 start++;
                 end--;
             }
+            str[j] = '\0';
         }
 
         return str;

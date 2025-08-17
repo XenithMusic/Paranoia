@@ -44,6 +44,7 @@ namespace ps2keyboard {
 
     const uint8_t ENABLE_SCANNING = 0xFF;
     extern ps2stateMachine state; // state machine
+    extern bool keysDown[0xFF];
 
     PS2Returns init(bool portTwo);
     PS2Returns processScancodes();

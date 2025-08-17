@@ -232,17 +232,201 @@ namespace ps2general {
 
 namespace ps2keyboard {
 
+    char* str = "testingonetwothree";
     const uint8_t ENABLE_SCANNING = 0xF4;
+    const uint8_t SELECT_SCANCODE = 0xF0;
     ps2stateMachine state; // state machine
+    PS2_STATES oldState;
+    PS2Returns codeStore;
+
+    bool keysDown[0xFF] = {};
+
+    Pair<uint64_t,KeyCode> set1codes[] = {
+        {0x01,NAVIG_ESCAPE},
+        {0x02,MATHS_1},
+        {0x03,MATHS_2},
+        {0x04,MATHS_3},
+        {0x05,MATHS_4},
+        {0x06,MATHS_5},
+        {0x07,MATHS_6},
+        {0x08,MATHS_7},
+        {0x09,MATHS_8},
+        {0x0A,MATHS_9},
+        {0x0B,MATHS_0},
+        {0x0C,MATHS_MINUS},
+        {0x0D,MATHS_EQUALS},
+        {0x0E,USAGE_BACKSPACE},
+        {0x0F,SYMBL_TAB},
+        {0x10,ALPHA_Q},
+        {0x11,ALPHA_W},
+        {0x12,ALPHA_E},
+        {0x13,ALPHA_R},
+        {0x14,ALPHA_T},
+        {0x15,ALPHA_Y},
+        {0x16,ALPHA_U},
+        {0x17,ALPHA_I},
+        {0x18,ALPHA_O},
+        {0x19,ALPHA_P},
+        {0x1A,SYMBL_OPEN_BRACKET},
+        {0x1B,SYMBL_CLOSE_BRACKET},
+        {0x1C,USAGE_ENTER},
+        {0x1D,MODIF_LEFT_CONTROL},
+        {0x26,ALPHA_L},
+        {0x27,SYMBL_SEMICOLON},
+        {0x28,SYMBL_APOSTROPHE},
+        {0x1E,ALPHA_A},
+        {0x1F,ALPHA_S},
+        {0x20,ALPHA_D},
+        {0x21,ALPHA_F},
+        {0x22,ALPHA_G},
+        {0x23,ALPHA_H},
+        {0x24,ALPHA_J},
+        {0x25,ALPHA_K},
+        {0x26,ALPHA_L},
+        {0x27,SYMBL_SEMICOLON},
+        {0x28,SYMBL_APOSTROPHE},
+        {0x29,SYMBL_BACKTICK},
+        {0x2A,MODIF_LEFT_SHIFT},
+        {0x2B,SYMBL_BACKSLASH},
+        {0x2C,ALPHA_Z},
+        {0x2D,ALPHA_X},
+        {0x2E,ALPHA_C},
+        {0x2F,ALPHA_V},
+        {0x30,ALPHA_B},
+        {0x31,ALPHA_N},
+        {0x32,ALPHA_M},
+        {0x33,SYMBL_COMMA},
+        {0x34,SYMBL_PERIOD},
+        {0x35,SYMBL_SLASH},
+        {0x36,MODIF_RIGHT_SHIFT},
+        {0x37,MATHS_KP_ASTERISK},
+        {0x38,MODIF_LEFT_ALT},
+        {0x39,ALPHA_SPACE},
+        {0x3A,USAGE_LOCK_CAPS},
+        {0x3B,USAGE_F1},
+        {0x3C,USAGE_F2},
+        {0x3D,USAGE_F3},
+        {0x3E,USAGE_F4},
+        {0x3F,USAGE_F5},
+        {0x40,USAGE_F6},
+        {0x41,USAGE_F7},
+        {0x42,USAGE_F8},
+        {0x43,USAGE_F9},
+        {0x44,USAGE_F10},
+        {0x45,USAGE_LOCK_NUMBER},
+        {0x46,USAGE_LOCK_SCROLL},
+        {0x47,MATHS_KP_7},
+        {0x48,MATHS_KP_8},
+        {0x49,MATHS_KP_9},
+        {0x4A,MATHS_KP_MINUS},
+        {0x4B,MATHS_KP_4},
+        {0x4C,MATHS_KP_5},
+        {0x4D,MATHS_KP_6},
+        {0x4E,MATHS_KP_PLUS},
+        {0x4F,MATHS_KP_1},
+        {0x50,MATHS_KP_2},
+        {0x51,MATHS_KP_3},
+        {0x52,MATHS_KP_0},
+        {0x53,MATHS_KP_PERIOD},
+        {0x57,USAGE_F11},
+        {0x58,USAGE_F12},
+
+        // 0xE0 keys
+
+        {0xE010,MEDIA_PREVIOUS_TRACK},
+        {0xE019,MEDIA_NEXT_TRACK},
+        {0xE01C,MATHS_KP_ENTER},
+        {0xE01D,MODIF_RIGHT_CONTROL},
+        {0xE020,MEDIA_MUTE},
+        {0xE021,MEDIA_CALCULATOR},
+        {0xE022,MEDIA_PLAY},
+        {0xE024,MEDIA_STOP},
+        {0xE02E,MEDIA_VOLUME_DOWN},
+        {0xE030,MEDIA_VOLUME_UP},
+        {0xE032,MEDIA_WWW_HOME},
+        {0xE035,MATHS_KP_SLASH},
+        {0xE038,MODIF_RIGHT_ALT},
+        {0xE047,NAVIG_HOME},
+        {0xE048,NAVIG_ARROW_UP},
+        {0xE049,NAVIG_PAGE_UP},
+        {0xE04B,NAVIG_ARROW_LEFT},
+        {0xE04D,NAVIG_ARROW_RIGHT},
+        {0xE04F,NAVIG_END},
+        {0xE050,NAVIG_ARROW_DOWN},
+        {0xE051,NAVIG_PAGE_DOWN},
+        {0xE052,NAVIG_INSERT},
+        {0xE053,NAVIG_DELETE},
+        {0xE05B,MODIF_LEFT_META},
+        {0xE05C,MODIF_RIGHT_META},
+        {0xE05D,USAGE_MENU},
+        {0xE05E,CNTRL_POWER},
+        {0xE05F,CNTRL_SLEEP},
+        {0xE063,CNTRL_WAKE},
+        {0xE065,MEDIA_WWW_SEARCH},
+        {0xE066,MEDIA_WWW_FAVORITES},
+        {0xE067,MEDIA_WWW_REFRESH},
+        {0xE068,MEDIA_WWW_STOP},
+        {0xE069,MEDIA_WWW_FORWARD},
+        {0xE06A,MEDIA_WWW_BACK},
+        {0xE06B,MEDIA_MY_COMPUTER},
+        {0xE06C,MEDIA_EMAIL},
+        {0xE06D,MEDIA_SELECT},
+        {0xE02AE037,USAGE_PRTSC},
+        {0xE0B7E0AA,USAGE_PRTSC},
+        {0xE11D45E19DC5,USAGE_PAUSE},
+    };
+
+    volatile PS2Returns waitAck(uint64_t timeout) {
+        while (state.state == WaitingForAck) {
+            timeout--;
+            if (timeout <= 0) {
+                break;
+            }
+            asm("");
+        }
+        if (state.state == WaitingForAck) {
+            Terminal::print("waitAck timed out\n");
+            return PS2Timeout;
+        }
+        if (state.data[0] == ps2general::ACK) {
+            Terminal::print("waitAck success!\n");
+            state.data[0] = 0;
+            state.queueSize = 0;
+            return Success;
+        }
+        Terminal::print("waitAck got wrong value!\n0x");
+            Terminal::print(parseInt(state.data[0],str,16));
+            Terminal::print("\n");
+        return NoAck;
+    }
+
+    PS2Returns changeScancodeSet(uint8_t scancodeSet) {
+        oldState = state.state;
+        state.state = WaitingForAck;
+
+        while (inb(0x64) & 1) inb(0x60);
+        ps2general::sendData(SELECT_SCANCODE);
+        codeStore = waitAck(1000);
+        if (codeStore != Success) return codeStore;
+        
+        while (inb(0x64) & 1) inb(0x60);
+        ps2general::sendData(scancodeSet);
+        codeStore = waitAck(1000);
+        if (codeStore != Success) return codeStore;
+
+        state.state = oldState;
+
+        return Success;
+    }
 
     PS2Returns init(bool portTwo) {
         if (portTwo == false) {
-            state.state = EnablingScanning;
+            state.state = WaitingForAck;
             while (inb(0x64) & 1) inb(0x60); // flush the buffer
             ps2general::sendData(ENABLE_SCANNING);
             sti();
             uint8_t timeout = 100000;
-            while (state.state == EnablingScanning) {
+            while (state.state == WaitingForAck) {
                 timeout--;
                 if (timeout <= 0) {
                     break;
@@ -250,26 +434,62 @@ namespace ps2keyboard {
             }
             if (state.state == NoProcess) {
                 // we recieved data!
-                if (state.data1 == ps2general::ACK) {
+                if (state.data[0] == ps2general::ACK) {
                     Terminal::print("acked\n");
+                    codeStore = changeScancodeSet(2);
+                    // if (codeStore != Success) return codeStore;
                     state.state = WaitingForScancodes;
+                    state.data[0] = 0;
+                    state.queueSize = 0;
                     
                     return Success;
                 }
                 return NoAck;
-            } else if (state.state == EnablingScanning) {
+            } else if (state.state == WaitingForAck) {
                 return PS2Timeout;
             }
             return UnexpectedState;
         }
     }
 
+    Pair<KeyCode,KeyMode> scancodeToKeycode(uint8_t set,uint64_t scancode) {
+        for (Pair<uint64_t,KeyCode> pair : set1codes) {
+            if (scancode == pair.first) {
+                return {pair.second,PRESSED};
+            }
+            if (scancode-0x80 == pair.first) {
+                return {pair.second,RELEASED};
+            }
+        }
+    }
+
     PS2Returns processScancodes() {
         if (state.state == EatingScancode) {
-            Terminal::print("Scancode!");
-            state.data1 = state.data2;
-            state.data2 = 0x00;
-            if (state.data1 == 0x00) {
+            Terminal::printdebug("Scancode!\n");
+            Terminal::printdebug("Scanned: ");
+            Terminal::printdebug(parseInt(state.data[0],str,16));
+            if (state.data[0] > 0xFF) {
+                Terminal::printdebug(" (this should be larger than 0xFF)");
+            } // E0 2A E0 37    E0 B7 E0 AA
+            if (state.data[0] == 0xE02AE037) {
+                Terminal::printdebug(" (prtsc pressed)");
+            }
+            if (state.data[0] == 0xE0B7E0AA) {
+                Terminal::printdebug(" (prtsc released)");
+            }
+            Terminal::printdebug("\n");
+            Pair<KeyCode,KeyMode> keypair = scancodeToKeycode(state.scancodeSet,state.data[0]);
+            keysDown[keypair.first] = keypair.second == PRESSED;
+            keysDown[MODIF_ANY_ALT] = keysDown[MODIF_LEFT_ALT] or keysDown[MODIF_RIGHT_ALT];
+            keysDown[MODIF_ANY_SHIFT] = keysDown[MODIF_LEFT_SHIFT] or keysDown[MODIF_RIGHT_SHIFT];
+            keysDown[MODIF_ANY_CONTROL] = keysDown[MODIF_LEFT_CONTROL] or keysDown[MODIF_RIGHT_CONTROL];
+            keysDown[MODIF_ANY_META] = keysDown[MODIF_LEFT_META] or keysDown[MODIF_RIGHT_META];
+            state.data[0] = state.data[1];
+            state.data[1] = state.data[2];
+            state.data[2] = state.data[3];
+            state.data[3] = 0;
+            state.queueSize--;
+            if (state.data[0] == 0x00) {
                 state.state = WaitingForScancodes;
             }
         }

@@ -75,9 +75,9 @@ void fault(int errno,char* string) {
 		Terminal::print(string);
 		Terminal::print("\n");
 	}
-	Terminal::print("  Stack Trace: ");
+	Terminal::print("  Stack Trace:\n\n");
 	stackTrace(20);
-	Terminal::print("\n\n");
+	Terminal::print("\n");
 	Terminal::print("Your computer will not restart itself.\n\n");
 	Terminal::print("FAULT specific details:\n");
 	if (errno == 69420) {

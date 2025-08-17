@@ -56,17 +56,185 @@ enum vga_color {
 
 enum PS2_STATES {
     NoProcess,
+    WaitingForAck,
     EnablingScanning,
     WaitingForScancodes,
     EatingScancode,
+    WaitingForPart,
 };
 
 struct ps2stateMachine {
     PS2_STATES state = NoProcess;
-    uint8_t data1 = 0x00;
-    uint8_t data2 = 0x00;
+    uint8_t queueSize = 0;
+    uint64_t data[4] = {};
+    uint8_t stateInfo1 = 0;
+    uint8_t stateInfo2 = 0;
+    uint8_t scancodeSet = 0x01;
+    bool overwhelmed = 0;
 };
 
+enum KeyCode {
+    // Alphabetical
+    ALPHA_A=0b00000000,
+    ALPHA_B,
+    ALPHA_C,
+    ALPHA_D,
+    ALPHA_E,
+    ALPHA_F,
+    ALPHA_G,
+    ALPHA_H,
+    ALPHA_I,
+    ALPHA_J,
+    ALPHA_K,
+    ALPHA_L,
+    ALPHA_M,
+    ALPHA_N,
+    ALPHA_O,
+    ALPHA_P,
+    ALPHA_Q,
+    ALPHA_R,
+    ALPHA_S,
+    ALPHA_T,
+    ALPHA_U,
+    ALPHA_V,
+    ALPHA_W,
+    ALPHA_X,
+    ALPHA_Y,
+    ALPHA_Z,
+    ALPHA_SPACE,
+    // Mathematical (keypad and their non-keypad equivalents)
+    MATHS_0=0b00100000,
+    MATHS_1,
+    MATHS_2,
+    MATHS_3,
+    MATHS_4,
+    MATHS_5,
+    MATHS_6,
+    MATHS_7,
+    MATHS_8,
+    MATHS_9,
+    MATHS_MINUS,
+    MATHS_EQUALS,
+    MATHS_KP_0,
+    MATHS_KP_1,
+    MATHS_KP_2,
+    MATHS_KP_3,
+    MATHS_KP_4,
+    MATHS_KP_5,
+    MATHS_KP_6,
+    MATHS_KP_7,
+    MATHS_KP_8,
+    MATHS_KP_9,
+    MATHS_KP_SLASH,
+    MATHS_KP_ASTERISK,
+    MATHS_KP_MINUS,
+    MATHS_KP_PLUS,
+    MATHS_KP_ENTER,
+    MATHS_KP_PERIOD,
+    // SYMBOLIC
+    SYMBL_BACKTICK=0b01000000, // `
+    SYMBL_OPEN_BRACKET, // [
+    SYMBL_CLOSE_BRACKET, // ]
+    SYMBL_BACKSLASH,
+    SYMBL_SEMICOLON,
+    SYMBL_APOSTROPHE,
+    SYMBL_COMMA,
+    SYMBL_SLASH,
+    SYMBL_PERIOD,
+    SYMBL_TAB,
+    // MODIFIER
+    MODIF_LEFT_SHIFT=0b01100000,
+    MODIF_LEFT_CONTROL,
+    MODIF_LEFT_META,
+    MODIF_LEFT_ALT,
+    MODIF_RIGHT_ALT,
+    MODIF_RIGHT_META,
+    MODIF_RIGHT_CONTROL,
+    MODIF_RIGHT_SHIFT,
+    MODIF_ANY_SHIFT,
+    MODIF_ANY_CONTROL,
+    MODIF_ANY_META,
+    MODIF_ANY_ALT,
+    // USAGE
+    USAGE_BACKSPACE=0b10000000,
+    USAGE_ENTER,
+    USAGE_MENU,
+    USAGE_LOCK_CAPS,
+    USAGE_LOCK_SCROLL,
+    USAGE_LOCK_NUMBER,
+    USAGE_PRTSC,
+    USAGE_PAUSE,
+    USAGE_F1,
+    USAGE_F2,
+    USAGE_F3,
+    USAGE_F4,
+    USAGE_F5,
+    USAGE_F6,
+    USAGE_F7,
+    USAGE_F8,
+    USAGE_F9,
+    USAGE_F10,
+    USAGE_F11,
+    USAGE_F12,
+    USAGE_F13,
+    USAGE_F14,
+    USAGE_F15,
+    USAGE_F16,
+    USAGE_F17,
+    USAGE_F18,
+    USAGE_F19,
+    USAGE_F20,
+    USAGE_F21,
+    USAGE_F22,
+    USAGE_F23,
+    USAGE_F24,
+    // NAVIGATION
+    NAVIG_HOME=0b10100000,
+    NAVIG_END,
+    NAVIG_PAGE_UP,
+    NAVIG_PAGE_DOWN,
+    NAVIG_ARROW_UP,
+    NAVIG_ARROW_LEFT,
+    NAVIG_ARROW_DOWN,
+    NAVIG_ARROW_RIGHT,
+    NAVIG_ESCAPE,
+    NAVIG_INSERT,
+    NAVIG_DELETE,
+    // MEDIA
+    MEDIA_PREVIOUS_TRACK=0b11000000,
+    MEDIA_NEXT_TRACK,
+    MEDIA_MUTE,
+    MEDIA_CALCULATOR,
+    MEDIA_PLAY,
+    MEDIA_STOP,
+    MEDIA_VOLUME_DOWN,
+    MEDIA_VOLUME_UP,
+    MEDIA_WWW_HOME,
+    MEDIA_WWW_SEARCH,
+    MEDIA_WWW_FAVORITES,
+    MEDIA_WWW_REFRESH,
+    MEDIA_WWW_STOP,
+    MEDIA_WWW_FORWARD,
+    MEDIA_WWW_BACK,
+    MEDIA_MY_COMPUTER,
+    MEDIA_EMAIL,
+    MEDIA_SELECT,
+    // CONTROL
+    CNTRL_POWER=0b11100000,
+    CNTRL_SLEEP,
+    CNTRL_WAKE,
+};
+
+enum KeyMode {
+    PRESSED,
+    RELEASED
+};
+
+template <typename First,typename Second>
+struct Pair {
+    First first;
+    Second second;
+};
 
 enum syscall_fail {
     SCFAIL_FAULT_FAILURE = 1000,

@@ -26,6 +26,10 @@ You should have received a copy of the GNU General Public License along with Par
 #define CONST_KERNELSIZE 0
 #endif
 
+#ifndef CONST_DEBUGGING
+#define CONST_DEBUGGING false
+#endif
+
 #define KIBIBYTES 1024
 #define MEBIBYTES 1048576
 #define GIBIBYTES 1073741824

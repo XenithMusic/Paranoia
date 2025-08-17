@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include "string.h"
 #include "types.h"
+#include "const.h"
 
 /*
 
@@ -125,6 +126,11 @@ namespace Terminal {
     }
     void print(const char* str) {
         write(str,strlen(str));
+    }
+    void printdebug(const char* str) {
+        if (CONST_DEBUGGING)
+            return print(str);
+        return;
     }
     void GPL() {
         print("Paranoia  Copyright (C) 2024  XenithMusic\n");

@@ -43,9 +43,10 @@ extern "C" {
 		outb(PIC2_DATA, 0x01);
 		// optionally, clear data registers (mask all IRQs for now)
 		// doing this manually lol
-		uint8_t PIC1_IRQ_MASK = ~0b00000010;
-		// PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
-		uint8_t PIC2_IRQ_MASK = ~0b00000010;
+		uint8_t PIC1_IRQ_MASK = 0xFF;
+		PIC1_IRQ_MASK &= ~(1 << 0); // unmask IRQ0
+		PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
+		uint8_t PIC2_IRQ_MASK = 0xFF;
 		outb(PIC1_DATA, PIC1_IRQ_MASK);
 		outb(PIC2_DATA, PIC2_IRQ_MASK);
 	}

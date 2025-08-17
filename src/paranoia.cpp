@@ -43,6 +43,12 @@ TODO:
             -- i have exceptions right now --
     [X] Put the addresses of the ISR handlers in the appropiate descriptors (in the IDT)
 
+- PS/2 Keyboard Driver
+    [X] Interrupts working
+    [ ] Changing scancode sets
+    [X] Interrupts parsed
+    [X] Expose a "keys pressed" variable
+
 */
 
 extern "C" {
@@ -122,7 +128,7 @@ extern "C" {
         response = ps2keyboard::init(false);
         if (response != Success) {
             if (response == PS2Timeout) {
-                fault(-402,"Timed out while waiting for a response.");
+                fault(-402,"Timed out while waiting for a response.\n         (is the controller unresponsive?)");
             } else if (response == NoAck) {
                 fault(-402,"Something should've been acknowledged, but wasn't.");
             } else {
@@ -134,20 +140,20 @@ extern "C" {
             Terminal::print("] Initialized PS/2 Keyboard.");
             Terminal::print("\n");
 
-        // Terminal::print("System information:\n");
-        // Terminal::print("KERNEL:             PARANOIA\n");
-        // Terminal::print("- VERSION:            ");
-        //     Terminal::print(CONST_VERSION);
-        //     Terminal::print("\n");
-        // Terminal::print("- COMPILATION DATE:   ");
-        //     Terminal::print(CONST_COMPDATE);
-        //     Terminal::print("\n");
-        // Terminal::print("- AUTHORED BY:        ");
-        //     Terminal::print(CONST_AUTHOR);
-        //     Terminal::print("\n");
-        // Terminal::print("- KERNEL SIZE:        ");
-        //     Terminal::print(parseDouble((double)CONST_KERNELSIZE/4/1024,str,2));
-        //     Terminal::print("MiB\n");
+        Terminal::print("System information:\n");
+        Terminal::print("KERNEL:             PARANOIA\n");
+        Terminal::print("- VERSION:            ");
+            Terminal::print(CONST_VERSION);
+            Terminal::print("\n");
+        Terminal::print("- COMPILATION DATE:   ");
+            Terminal::print(CONST_COMPDATE);
+            Terminal::print("\n");
+        Terminal::print("- AUTHORED BY:        ");
+            Terminal::print(CONST_AUTHOR);
+            Terminal::print("\n");
+        Terminal::print("- KERNEL SIZE:        ");
+            Terminal::print(parseDouble((double)CONST_KERNELSIZE/4/1024,str,2));
+            Terminal::print("MiB\n");
         
         // // You can add more setup here (keyboard, time, etc.)
 
@@ -167,10 +173,18 @@ extern "C" {
         while (1) {
             tick = get_pit_seconds();
 
-            if (lastTick+1 < tick) {
+            if (lastTick+0.1 < tick) {
                 lastTick = tick;
-                // Terminal::print(parseDouble(tick,str,10));
-                // Terminal::print("\n");
+                if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_CONTROL] and 
+                    ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT] and 
+                    not ps2keyboard::keysDown[KeyCode::MODIF_ANY_ALT] and 
+                    not ps2keyboard::keysDown[KeyCode::MODIF_ANY_META] and 
+                    ps2keyboard::keysDown[KeyCode::ALPHA_T]) {
+                    Terminal::print("[");
+                        Terminal::print(parseDouble(tick,str,10));
+                        Terminal::print("] Keybind message print.");
+                        Terminal::print("\n");
+                }
             }
             if (ps2keyboard::state.state == EatingScancode)
                 ps2keyboard::processScancodes();

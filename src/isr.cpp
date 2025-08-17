@@ -12,6 +12,10 @@
 #define PIC2_COMMAND	PIC2
 #define PIC2_DATA	(PIC2+1)
 
+#define SCANCODE_EXTENDED 0b00000001
+#define SCANCODE_RELEASED 0b00000010
+#define SCANCODE_GUARANTEE 0b00000100
+
 // Simple ISR for handling exceptions
 extern "C" {
     void beginInterrupt() {
@@ -42,16 +46,67 @@ extern "C" {
     void irq1_assembly();
     void irq1_handler() {
         volatile uint8_t scancode = inb(0x60);
+        uint64_t proc;
+        auto &st = ps2keyboard::state;
+        PS2_STATES newState = st.state;
         eoi(1);
-        if (ps2keyboard::state.state == EnablingScanning) {
-            ps2keyboard::state.state = NoProcess;
-            ps2keyboard::state.data1 = scancode;
-        } else if (ps2keyboard::state.state == WaitingForScancodes) {
-            ps2keyboard::state.state = EatingScancode;
-            ps2keyboard::state.data1 = scancode;
-        } else if (ps2keyboard::state.state == EatingScancode) {
-            if (ps2keyboard::state.data2 == 0x00) {
-                ps2keyboard::state.data2 = scancode; // Queue up an extra scancode
+        if (newState == WaitingForAck) {
+            if (scancode == 0x00) {
+                return; // ignore spurious zero
+            }
+            if (scancode >= 0x00) Terminal::print("AAA");
+            st.data[0] = 0|scancode;
+            st.queueSize = 1; // discard all data because i sorta have to
+            st.state = NoProcess;
+        } else if (newState == WaitingForScancodes or newState == EatingScancode) {
+            proc = st.data[st.queueSize];
+            if (proc == 0) {
+                st.stateInfo1 = 0;
+                st.stateInfo2 = 0;
+            }
+            proc <<= 8;
+            proc |= scancode;
+            if (st.stateInfo1 > 0) st.stateInfo1--;
+            if (st.queueSize > 4) { // check if there is space in the 'queue'
+                st.overwhelmed = true; // i cannot do anything further here; this is a fail condition
+                return;
+            }
+            if ((st.stateInfo2&SCANCODE_GUARANTEE) == 0) { // scancode is not guaranteed
+                if (st.scancodeSet == 1) {
+                    if (proc == 0xE02A) { // guaranteed to be E0 2A E0 37 - prtsc press
+                        st.stateInfo2 |= SCANCODE_GUARANTEE; // bit 3: guaranteed
+                        st.stateInfo1 = 2;
+                    } else if (proc == 0xE0B7) { // guaranteed to be E0 B7 E0 AA - prtsc release
+                        st.stateInfo2 |= SCANCODE_GUARANTEE; // bit 3: guaranteed
+                        st.stateInfo1 = 2;
+                    } else if (proc == 0xE1) { // guaranteed to be E1 1D 45 E1 9D C5 - pause press, pause release
+                        st.stateInfo2 |= SCANCODE_GUARANTEE; // bit 3: guaranteed
+                        st.stateInfo1 = 5;
+                    }
+                } else if (st.scancodeSet == 2) {
+                    if (proc == 0xE012) { // guaranteed to be E0 12 E0 7C - prtsc press
+                        st.stateInfo2 |= SCANCODE_GUARANTEE; // bit 3: guaranteed
+                        st.stateInfo1 = 2;
+                    } else if (proc == 0xE0F07C) { // guaranteed to be E0 F0 7C E0 F0 12 - prtsc release
+                        st.stateInfo2 |= SCANCODE_GUARANTEE; // bit 3: guaranteed
+                        st.stateInfo1 = 3;
+                    } else if (proc == 0xE1) { // guaranteed to be E1 14 77 E1 F0 14 F0 77 - pause press, pause release
+                        st.stateInfo2 |= SCANCODE_GUARANTEE; // bit 3: guaranteed
+                        st.stateInfo1 = 7;
+                    }
+                }
+                if (scancode == 0xE0) { // EXTENDED
+                    st.stateInfo2 |= SCANCODE_EXTENDED; // bit 1: extended
+                    st.stateInfo1 = 1;
+                } else if (scancode == 0xF0) { // RELEASES
+                    st.stateInfo2 |= SCANCODE_RELEASED; // bit 1: released
+                    st.stateInfo1 = 1;
+                }
+            }
+            st.data[st.queueSize] = proc;
+            if (st.stateInfo1 == 0) {
+                st.queueSize++;
+                st.state = EatingScancode;
             }
         }
     }

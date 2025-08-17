@@ -34,6 +34,7 @@ namespace Terminal {
     void putChar(char c);
     void write(const char* c,size_t size);
     void print(const char* str);
+    void printdebug(const char* str);
     void setRow(int value);
     void setCol(int value);
 }

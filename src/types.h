@@ -15,6 +15,11 @@ You should have received a copy of the GNU General Public License along with Par
 
 #pragma once
 
+struct spinlock_t {
+    bool locked;
+    void* resource;
+};
+
 typedef struct {
     uint32_t flags;
     uint32_t mem_lower;
@@ -71,6 +76,12 @@ struct ps2stateMachine {
     uint8_t stateInfo2 = 0;
     uint8_t scancodeSet = 0x01;
     bool overwhelmed = 0;
+};
+
+template <typename First,typename Second>
+struct Pair {
+    First first;
+    Second second;
 };
 
 enum KeyCode {
@@ -230,11 +241,113 @@ enum KeyMode {
     RELEASED
 };
 
-template <typename First,typename Second>
-struct Pair {
-    First first;
-    Second second;
+const Pair<KeyCode,char> codesAscii[] = {
+    {ALPHA_A,'a'},
+    {ALPHA_B,'b'},
+    {ALPHA_C,'c'},
+    {ALPHA_D,'d'},
+    {ALPHA_E,'e'},
+    {ALPHA_F,'f'},
+    {ALPHA_G,'g'},
+    {ALPHA_H,'h'},
+    {ALPHA_I,'i'},
+    {ALPHA_J,'j'},
+    {ALPHA_K,'k'},
+    {ALPHA_L,'l'},
+    {ALPHA_M,'m'},
+    {ALPHA_N,'n'},
+    {ALPHA_O,'o'},
+    {ALPHA_P,'p'},
+    {ALPHA_Q,'q'},
+    {ALPHA_R,'r'},
+    {ALPHA_S,'s'},
+    {ALPHA_T,'t'},
+    {ALPHA_U,'u'},
+    {ALPHA_V,'v'},
+    {ALPHA_W,'w'},
+    {ALPHA_X,'x'},
+    {ALPHA_Y,'y'},
+    {ALPHA_Z,'z'},
+    {ALPHA_SPACE,' '},
+    {USAGE_ENTER,'\n'},
+    {MATHS_1,'1'},
+    {MATHS_2,'2'},
+    {MATHS_3,'3'},
+    {MATHS_4,'4'},
+    {MATHS_5,'5'},
+    {MATHS_6,'6'},
+    {MATHS_7,'7'},
+    {MATHS_8,'8'},
+    {MATHS_9,'9'},
+    {MATHS_0,'0'},
+    {MATHS_KP_0,'0'},
+    {MATHS_KP_1,'1'},
+    {MATHS_KP_2,'2'},
+    {MATHS_KP_3,'3'},
+    {MATHS_KP_4,'4'},
+    {MATHS_KP_5,'5'},
+    {MATHS_KP_6,'6'},
+    {MATHS_KP_7,'7'},
+    {MATHS_KP_8,'8'},
+    {MATHS_KP_9,'9'},
+    {SYMBL_BACKTICK,'`'},
+    {MATHS_MINUS,'-'},
+    {MATHS_EQUALS,'='},
 };
+
+const Pair<KeyCode,char> codesAsciiCapital[] = {
+        {ALPHA_A,'A'},
+        {ALPHA_B,'B'},
+        {ALPHA_C,'C'},
+        {ALPHA_D,'D'},
+        {ALPHA_E,'E'},
+        {ALPHA_F,'F'},
+        {ALPHA_G,'G'},
+        {ALPHA_H,'H'},
+        {ALPHA_I,'I'},
+        {ALPHA_J,'J'},
+        {ALPHA_K,'K'},
+        {ALPHA_L,'L'},
+        {ALPHA_M,'M'},
+        {ALPHA_N,'N'},
+        {ALPHA_O,'O'},
+        {ALPHA_P,'P'},
+        {ALPHA_Q,'Q'},
+        {ALPHA_R,'R'},
+        {ALPHA_S,'S'},
+        {ALPHA_T,'T'},
+        {ALPHA_U,'U'},
+        {ALPHA_V,'V'},
+        {ALPHA_W,'W'},
+        {ALPHA_X,'X'},
+        {ALPHA_Y,'Y'},
+        {ALPHA_Z,'Z'},
+        {ALPHA_SPACE,' '},
+        {USAGE_ENTER,'\n'},
+        {MATHS_1,'!'},
+        {MATHS_2,'@'},
+        {MATHS_3,'#'},
+        {MATHS_4,'$'},
+        {MATHS_5,'%'},
+        {MATHS_6,'^'},
+        {MATHS_7,'&'},
+        {MATHS_8,'*'},
+        {MATHS_9,'('},
+        {MATHS_0,')'},
+        {MATHS_KP_0,'0'},
+        {MATHS_KP_1,'1'},
+        {MATHS_KP_2,'2'},
+        {MATHS_KP_3,'3'},
+        {MATHS_KP_4,'4'},
+        {MATHS_KP_5,'5'},
+        {MATHS_KP_6,'6'},
+        {MATHS_KP_7,'7'},
+        {MATHS_KP_8,'8'},
+        {MATHS_KP_9,'9'},
+        {SYMBL_BACKTICK,'~'},
+        {MATHS_MINUS,'_'},
+        {MATHS_EQUALS,'+'},
+    };
 
 enum syscall_fail {
     SCFAIL_FAULT_FAILURE = 1000,

@@ -51,11 +51,11 @@ extern "C" {
         PS2_STATES newState = st.state;
         eoi(1);
         if (newState == WaitingForAck) {
-            if (scancode == 0x00) {
-                return; // ignore spurious zero
-            }
-            if (scancode >= 0x00) Terminal::print("AAA");
-            st.data[0] = 0|scancode;
+            // Terminal::print("Whoa!\n");
+            // if (scancode == 0xFA) {
+            //     Terminal::print("ACK\n");
+            // }
+            st.data[0] = scancode;
             st.queueSize = 1; // discard all data because i sorta have to
             st.state = NoProcess;
         } else if (newState == WaitingForScancodes or newState == EatingScancode) {

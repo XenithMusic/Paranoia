@@ -122,11 +122,13 @@ namespace ps2general {
             return PS2Timeout;
         }
 
-        config &= 0b10000100; // clear bits 0, 4, and 6 -- WRONG, CLEAR 0, 1, 4, and 6 (0b01101011)
+        config &= 0b00110100; // clear bits 0, 4, and 6 -- WRONG, CLEAR 0, 1, 4, and 6 (0b01101011)
 
         sendCommand16(WRITE_CONFIG_BYTE,config);
 
         // SELF TEST
+
+        while (inb(0x64) & 2) {}
 
         sendCommand(SELF_TEST);
         if (not waitForReadReady(10000)) {
@@ -178,12 +180,12 @@ namespace ps2general {
         config = fetchConfigurationByte();
 
         if (portOneWorking) {
-            Terminal::print("Enabled port one.\n");
+            Terminal::printdebug("Enabled port one.\n");
             sendCommand(ENABLE_PORT_1);
             config |= 0b00010001;
         }
         if (portTwoWorking) {
-            Terminal::print("Enabled port two.\n");
+            Terminal::printdebug("Enabled port two.\n");
             sendCommand(ENABLE_PORT_2);
             config |= 0b00100010;
         }
@@ -234,6 +236,7 @@ namespace ps2keyboard {
 
     char* str = "testingonetwothree";
     const uint8_t ENABLE_SCANNING = 0xF4;
+    const uint8_t DISABLE_SCANNING = 0xF5;
     const uint8_t SELECT_SCANCODE = 0xF0;
     ps2stateMachine state; // state machine
     PS2_STATES oldState;
@@ -376,7 +379,25 @@ namespace ps2keyboard {
         {0xE11D45E19DC5,USAGE_PAUSE},
     };
 
-    volatile PS2Returns waitAck(uint64_t timeout) {
+    void flushBuffer() {
+        while (inb(0x64) & 1) inb(0x60);
+    }
+
+    PS2Returns waitReady(int timeout) {
+        while ((inb(0x64) & 0x02) != 0) {
+            timeout--;
+            if (timeout <= 0) {
+                break;
+            }
+            asm("");
+        }
+        if (timeout <= 0) {
+            return PS2Timeout;
+        }
+        return Success;
+    }
+
+    volatile uint8_t waitResponse(int timeout) {
         while (state.state == WaitingForAck) {
             timeout--;
             if (timeout <= 0) {
@@ -385,72 +406,168 @@ namespace ps2keyboard {
             asm("");
         }
         if (state.state == WaitingForAck) {
-            Terminal::print("waitAck timed out\n");
+            Terminal::printdebug("waitResponse timed out\n");
+            return 0x00;
+        }
+        return state.data[0];
+
+    }
+
+    volatile PS2Returns waitAck(int timeout) {
+        while (state.state == WaitingForAck) {
+            timeout--;
+            if (timeout <= 0) {
+                break;
+            }
+            asm("");
+        }
+        if (state.state == WaitingForAck) {
+            Terminal::printdebug("waitAck timed out\n");
             return PS2Timeout;
         }
         if (state.data[0] == ps2general::ACK) {
-            Terminal::print("waitAck success!\n");
+            Terminal::printdebug("waitAck success!\n");
             state.data[0] = 0;
             state.queueSize = 0;
             return Success;
         }
-        Terminal::print("waitAck got wrong value!\n0x");
-            Terminal::print(parseInt(state.data[0],str,16));
-            Terminal::print("\n");
+        Terminal::printdebug("waitAck got wrong value!\n0x");
+            Terminal::printdebug(parseInt(state.data[0],str,16));
+            Terminal::printdebug("\n");
         return NoAck;
     }
 
-    PS2Returns changeScancodeSet(uint8_t scancodeSet) {
+    PS2Returns disableScanning() {
         oldState = state.state;
         state.state = WaitingForAck;
-
-        while (inb(0x64) & 1) inb(0x60);
-        ps2general::sendData(SELECT_SCANCODE);
+        codeStore = waitReady(1000);
+        if (codeStore != Success) return codeStore;
+        ps2general::sendData(DISABLE_SCANNING);
         codeStore = waitAck(1000);
         if (codeStore != Success) return codeStore;
-        
-        while (inb(0x64) & 1) inb(0x60);
-        ps2general::sendData(scancodeSet);
-        codeStore = waitAck(1000);
-        if (codeStore != Success) return codeStore;
-
+        Terminal::printdebug("DSSCAN SUCCESS\n");
         state.state = oldState;
-
         return Success;
     }
 
-    PS2Returns init(bool portTwo) {
-        if (portTwo == false) {
-            state.state = WaitingForAck;
-            while (inb(0x64) & 1) inb(0x60); // flush the buffer
-            ps2general::sendData(ENABLE_SCANNING);
-            sti();
-            uint8_t timeout = 100000;
-            while (state.state == WaitingForAck) {
-                timeout--;
-                if (timeout <= 0) {
-                    break;
-                }
-            }
-            if (state.state == NoProcess) {
-                // we recieved data!
-                if (state.data[0] == ps2general::ACK) {
-                    Terminal::print("acked\n");
-                    codeStore = changeScancodeSet(2);
-                    // if (codeStore != Success) return codeStore;
-                    state.state = WaitingForScancodes;
-                    state.data[0] = 0;
-                    state.queueSize = 0;
-                    
-                    return Success;
-                }
-                return NoAck;
-            } else if (state.state == WaitingForAck) {
-                return PS2Timeout;
-            }
-            return UnexpectedState;
-        }
+    PS2Returns enableScanning() {
+        oldState = state.state;
+        state.state = WaitingForAck;
+        codeStore = waitReady(1000);
+        if (codeStore != Success) return codeStore;
+        ps2general::sendData(ENABLE_SCANNING);
+        codeStore = waitAck(1000);
+        if (codeStore != Success) return codeStore;
+        Terminal::printdebug("ENSCAN SUCCESS\n");
+        state.state = oldState;
+        return Success;
     }
+
+    volatile PS2Returns changeScancodeSet(uint8_t scancodeSet) {
+        codeStore = disableScanning();
+        if (codeStore != Success) return codeStore;
+        oldState = state.state;
+        state.state = WaitingForAck;
+        Terminal::printdebug("Checking status...\n");
+        Terminal::printdebug("Waited for ready successfully.\n");
+        flushBuffer();
+        ps2general::sendData(SELECT_SCANCODE);
+        codeStore = waitAck(1000);
+        if (codeStore != Success) return codeStore;
+        Terminal::printdebug("Waited for ack successfully.\n");
+
+        flushBuffer();
+
+        state.state = WaitingForAck;
+        codeStore = waitReady(1000);
+        if (codeStore != Success) return codeStore;
+        Terminal::printdebug("Waited for ready successfully.\n");
+        flushBuffer();
+        ps2general::sendData(scancodeSet);
+        codeStore = waitAck(1000);
+        if (codeStore != Success) return codeStore;
+        Terminal::printdebug("Waited for ack successfully.\n");
+
+        state.state = oldState;
+
+        state.scancodeSet = scancodeSet;
+
+        Terminal::printdebug("WE'RE RETURNING SUCCESS, IT SHOULD NOT BE ERRORING!\n");
+        codeStore = enableScanning();
+        if (codeStore != Success) return codeStore;
+        return codeStore;
+    }
+
+    uint8_t checkScancodeSet() {
+        oldState = state.state;
+        state.state = WaitingForAck;
+        Terminal::printdebug("Checking status...\n");
+        Terminal::printdebug("Waited for ready successfully.\n");
+        flushBuffer();
+        ps2general::sendData(SELECT_SCANCODE);
+        codeStore = waitAck(1000);
+        if (codeStore != Success) return codeStore;
+        Terminal::printdebug("Waited for ack successfully.\n");
+
+        flushBuffer();
+
+        state.state = WaitingForAck;
+        codeStore = waitReady(1000);
+        if (codeStore != Success) return codeStore;
+        Terminal::printdebug("Waited for ready successfully.\n");
+        flushBuffer();
+        ps2general::sendData(0x00);
+        codeStore = waitAck(1000);
+        state.state = WaitingForAck;
+        if (codeStore != Success) return codeStore;
+        Terminal::printdebug("Waited for ack successfully.\n");
+        uint8_t scancodeSet = waitResponse(1000);
+
+        state.state = oldState;
+        return scancodeSet;
+    }
+
+    PS2Returns init(bool portTwo) {
+        sti();
+        codeStore = changeScancodeSet(2);
+        codeStore = changeScancodeSet(2);
+        Terminal::printdebug("\n\n\nAAA\n\n\n");
+        state.state = WaitingForScancodes;
+        return codeStore;
+    }
+
+    // PS2Returns init(bool portTwo) {
+    //     if (portTwo == false) {
+    //         state.state = WaitingForAck;
+    //         while (inb(0x64) & 1) inb(0x60); // flush the buffer
+    //         ps2general::sendData(ENABLE_SCANNING);
+    //         sti();
+    //         uint8_t timeout = 100000;
+    //         while (state.state == WaitingForAck) {
+    //             timeout--;
+    //             if (timeout <= 0) {
+    //                 break;
+    //             }
+    //         }
+    //         if (state.state == NoProcess) {
+    //             // we recieved data!
+    //             if (state.data[0] == ps2general::ACK) {
+    //                 Terminal::printdebug("acked\n");
+    //                 codeStore = changeScancodeSet(2);
+    //                 // if (codeStore != Success) return codeStore;
+    //                 state.state = WaitingForScancodes;
+    //                 state.data[0] = 0;
+    //                 state.queueSize = 0;
+                    
+    //                 return Success;
+    //             }
+    //             return NoAck;
+    //         } else if (state.state == WaitingForAck) {
+    //             return PS2Timeout;
+    //         }
+    //         return UnexpectedState;
+    //     }
+    // }
 
     Pair<KeyCode,KeyMode> scancodeToKeycode(uint8_t set,uint64_t scancode) {
         for (Pair<uint64_t,KeyCode> pair : set1codes) {
@@ -465,19 +582,19 @@ namespace ps2keyboard {
 
     PS2Returns processScancodes() {
         if (state.state == EatingScancode) {
-            Terminal::printdebug("Scancode!\n");
-            Terminal::printdebug("Scanned: ");
-            Terminal::printdebug(parseInt(state.data[0],str,16));
-            if (state.data[0] > 0xFF) {
-                Terminal::printdebug(" (this should be larger than 0xFF)");
-            } // E0 2A E0 37    E0 B7 E0 AA
-            if (state.data[0] == 0xE02AE037) {
-                Terminal::printdebug(" (prtsc pressed)");
-            }
-            if (state.data[0] == 0xE0B7E0AA) {
-                Terminal::printdebug(" (prtsc released)");
-            }
-            Terminal::printdebug("\n");
+            // Terminal::printdebug("Scancode!\n");
+            // Terminal::printdebug("Scanned: ");
+            // Terminal::printdebug(parseInt(state.data[0],str,16));
+            // if (state.data[0] > 0xFF) {
+            //     Terminal::printdebug(" (this should be larger than 0xFF)");
+            // } // E0 2A E0 37    E0 B7 E0 AA
+            // if (state.data[0] == 0xE02AE037) {
+            //     Terminal::printdebug(" (prtsc pressed)");
+            // }
+            // if (state.data[0] == 0xE0B7E0AA) {
+            //     Terminal::printdebug(" (prtsc released)");
+            // }
+            // Terminal::printdebug("\n");
             Pair<KeyCode,KeyMode> keypair = scancodeToKeycode(state.scancodeSet,state.data[0]);
             keysDown[keypair.first] = keypair.second == PRESSED;
             keysDown[MODIF_ANY_ALT] = keysDown[MODIF_LEFT_ALT] or keysDown[MODIF_RIGHT_ALT];

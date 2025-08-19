@@ -1,8 +1,28 @@
 #include "utils.h"
 
+#define PIC1		0x20		/* IO base address for master PIC */
+#define PIC2		0xA0		/* IO base address for slave PIC */
+#define PIC1_COMMAND	PIC1
+#define PIC1_DATA	(PIC1+1)
+#define PIC2_COMMAND	PIC2
+#define PIC2_DATA	(PIC2+1)
 
 namespace pic
 {
+
+	void remapPIC(uint8_t PIC1_IRQ_MASK,uint8_t PIC2_IRQ_MASK) {
+		outb(PIC1_COMMAND, 0x11); // starts the initialization sequence
+		outb(PIC2_COMMAND, 0x11);
+		outb(PIC1_DATA, 0x20); // remap offset of master PIC to 0x20 (32)
+		outb(PIC2_DATA, 0x28); // remap offset of slave PIC to 0x28 (40)
+		outb(PIC1_DATA, 0x04); // tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
+		outb(PIC2_DATA, 0x02); // tell Slave PIC its cascade identity (0000 0010)
+		outb(PIC1_DATA, 0x01); // set 8086/88 (MCS-80/85) mode
+		outb(PIC2_DATA, 0x01);
+		outb(PIC1_DATA, PIC1_IRQ_MASK); // mask interrupts
+		outb(PIC2_DATA, PIC2_IRQ_MASK);
+	}
+
     uint8_t in(bool isData) {
         uint16_t port = 0x20;
         if (isData) port = 0x21;

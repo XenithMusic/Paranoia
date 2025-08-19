@@ -7,7 +7,7 @@ extern "C" {
 	void handleSyscall(enum syscall_id id, int arg1, int arg2, int arg3) {
 		switch (id) {
 			case SCALL_SLEEP: {
-				sleep((double)arg1);
+				// busy_sleep((double)arg1);
 			}
 		}
 	}

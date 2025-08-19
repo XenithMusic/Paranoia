@@ -73,6 +73,7 @@ extern "C" {
 
         // Backlog of pre-terminal init
         Terminal::init();
+        Terminal::print("\n:: CPU INIT\n\n");
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" GDT initialized.");
             Terminal::print("\n");
@@ -89,7 +90,11 @@ extern "C" {
             Terminal::print(" PIT reset, time is measured in seconds since this message.");
             Terminal::print("\n");
 
-        // Post-terminal init
+        // INTERRUPTS
+
+        Terminal::print("\n:: INTERRUPTS (");
+            Terminal::print(parseDouble(get_pit_seconds(),str,10));
+            Terminal::print(")\n\n");
         
         initIDT(idt);
 
@@ -97,10 +102,10 @@ extern "C" {
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] IDT initialized.");
             Terminal::print("\n");
-        Terminal::print("[");
+
+        Terminal::print("\n:: DRIVERS (");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] Initializing Drivers...");
-            Terminal::print("\n");
+            Terminal::print(")\n\n");
         PS2Returns response = ps2general::init();
         if (response != Success) {
     //             NoPS2Controller,
@@ -140,6 +145,15 @@ extern "C" {
             Terminal::print("] Initialized PS/2 Keyboard.");
             Terminal::print("\n");
 
+        Terminal::print("\n:: SERVICES (");
+            Terminal::print(parseDouble(get_pit_seconds(),str,10));
+            Terminal::print(")\n\n");
+
+        // no services yet.
+        // - init syscalls
+        // - init scheduler
+        // - create first task and notify the scheduler
+
         Terminal::print("System information:\n");
         Terminal::print("KERNEL:             PARANOIA\n");
         Terminal::print("- VERSION:            ");
@@ -154,6 +168,9 @@ extern "C" {
         Terminal::print("- KERNEL SIZE:        ");
             Terminal::print(parseDouble((double)CONST_KERNELSIZE/4/1024,str,2));
             Terminal::print("MiB\n");
+        if (CONST_DEBUGGING) {
+            Terminal::print("!! WARNING: Running in debug mode, output may be far more verbose than usual!\n");
+        }
         
         // // You can add more setup here (keyboard, time, etc.)
 
@@ -167,13 +184,19 @@ extern "C" {
         // Terminal::print(parseDouble(get_pit_seconds(),str,10));
         // Terminal::print(" fourth call\n");
 
+        Terminal::print("\n:: HANDOFF (");
+            Terminal::print(parseDouble(get_pit_seconds(),str,10));
+            Terminal::print(")\n\n");
+
         double lastTick;
         double tick;
+
+        // temporary busy-loop. handoff to the scheduler here.
 
         while (1) {
             tick = get_pit_seconds();
 
-            if (lastTick+0.1 < tick) {
+            if (lastTick+0.01 < tick) {
                 lastTick = tick;
                 if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_CONTROL] and 
                     ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT] and 
@@ -184,6 +207,23 @@ extern "C" {
                         Terminal::print(parseDouble(tick,str,10));
                         Terminal::print("] Keybind message print.");
                         Terminal::print("\n");
+                } else {
+                    const Pair<KeyCode, char>* list = codesAscii;
+                    if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT]) {
+                        for (const Pair<KeyCode,char> pair : codesAsciiCapital) {
+                            if (ps2keyboard::keysDown[pair.first]) {
+                                ps2keyboard::keysDown[pair.first] = false;
+                                Terminal::print(&pair.second);
+                            }
+                        }
+                    } else {
+                        for (const Pair<KeyCode,char> pair : codesAscii) {
+                            if (ps2keyboard::keysDown[pair.first]) {
+                                ps2keyboard::keysDown[pair.first] = false;
+                                Terminal::print(&pair.second);
+                            }
+                        }
+                    }
                 }
             }
             if (ps2keyboard::state.state == EatingScancode)

@@ -66,7 +66,8 @@ extern "C" {
 		return seconds;
 	}
 
-	void sleep(double seconds) {
+	void busy_sleep(double seconds) {
+		// Please do not use. I will implement a non-busy sleep eventually.
 		double now = get_pit_seconds();
 		while (get_pit_seconds() < now+seconds) {};
 		return;

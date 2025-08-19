@@ -3,13 +3,7 @@
 #include "types.h"
 #include "utils.h"
 #include "isr.h"
-
-#define PIC1		0x20		/* IO base address for master PIC */
-#define PIC2		0xA0		/* IO base address for slave PIC */
-#define PIC1_COMMAND	PIC1
-#define PIC1_DATA	(PIC1+1)
-#define PIC2_COMMAND	PIC2
-#define PIC2_DATA	(PIC2+1)
+#include "pic.h"
 
 /*
 
@@ -33,22 +27,13 @@ uint8_t IDT_MAX_DESCRIPTORS = 0;
 
 extern "C" {
 	void remapPIC() {
-		outb(PIC1_COMMAND, 0x11); // starts the initialization sequence
-		outb(PIC2_COMMAND, 0x11);
-		outb(PIC1_DATA, 0x20); // remap offset of master PIC to 0x20 (32)
-		outb(PIC2_DATA, 0x28); // remap offset of slave PIC to 0x28 (40)
-		outb(PIC1_DATA, 0x04); // tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
-		outb(PIC2_DATA, 0x02); // tell Slave PIC its cascade identity (0000 0010)
-		outb(PIC1_DATA, 0x01); // set 8086/88 (MCS-80/85) mode
-		outb(PIC2_DATA, 0x01);
 		// optionally, clear data registers (mask all IRQs for now)
 		// doing this manually lol
 		uint8_t PIC1_IRQ_MASK = 0xFF;
 		PIC1_IRQ_MASK &= ~(1 << 0); // unmask IRQ0
 		PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
 		uint8_t PIC2_IRQ_MASK = 0xFF;
-		outb(PIC1_DATA, PIC1_IRQ_MASK);
-		outb(PIC2_DATA, PIC2_IRQ_MASK);
+		pic::remapPIC(PIC1_IRQ_MASK,PIC2_IRQ_MASK);
 	}
 	void catchAll() { // generic thing to see if any interrupts occur (do not replace)
 		while (1) __asm__ __volatile__ ("hlt");

@@ -39,4 +39,6 @@ namespace Allocator {
     void *malloc(size_t size);
 
     void free(void* pointer);
+
 }
+int kmemcmp(const void* s1, const void* s2, size_t n);

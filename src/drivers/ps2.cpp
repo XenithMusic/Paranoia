@@ -37,7 +37,7 @@ namespace ps2general {
 
     bool verifyPS2Controller() {
         return true; // TODO: HACK: VERY BAD PRACTICE. CHANGE THIS AS SOON AS POSSIBLE.
-                     //             DO NOT ASSUME PS/2 CONTROLLER. MY HOSTCOMPUTER DOES NOT HAVE PS/2, AND WILL CRASH.
+                     //             DO NOT ASSUME PS/2 CONTROLLER. MY HOST COMPUTER DOES NOT HAVE PS/2, AND WILL CRASH.
     }
     void sendCommand(uint8_t command) {
         outb(COMMAND_PORT,command);

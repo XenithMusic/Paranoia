@@ -1,28 +1,42 @@
-#include <cstdint>
+#include <stdint.h>
 #include <string.h>
 #include "types.h"
-#define ebdaptr 0x40E
+#include "memory.h"
+#define EBDA_PTR 0x40E
 #define RSDP_SIG "RSD PTR "
 #define BIOS_START 0xE0000
 #define BIOS_END 0x100000
 #define ALIGNMENT 16
 
-RSDPDescriptor* find_rsdp() {
-	// First, try EBDA
-	uint16_t* ebda_seg_ptr = (uint16_t*)0x40E;
-	uint32_t ebda_phys = (*ebda_seg_ptr) << 4;
+RSDPLegacyDescriptor* find_rsdp() {
+	uint16_t EBDA = *(uint16_t*)EBDA_PTR;
+	uint32_t EBDA_TRUE = (uint32_t)EBDA << 4;
+	uint8_t* search = (uint8_t*)EBDA_TRUE;
+	uint8_t* searchEnd = search+1024;
 
-	for (uint32_t addr = ebda_phys; addr < ebda_phys + 1024; addr += ALIGNMENT) {
-		if (memcmp((char*)addr, RSDP_SIG, 8) == 0)
-			return (RSDPDescriptor*)addr;
+	for (; search < searchEnd; search+=ALIGNMENT) {
+		if (kmemcmp(search,RSDP_SIG,8)) {
+			return (RSDPLegacyDescriptor*)search;
+		}
 	}
 
-	// Then, search BIOS memory area
-	for (uint32_t addr = BIOS_START; addr < BIOS_END; addr += ALIGNMENT) {
-		if (memcmp((char*)addr, RSDP_SIG, 8) == 0)
-			return (RSDPDescriptor*)addr;
+	search = (uint8_t*)BIOS_START;
+	searchEnd = (uint8_t*)BIOS_END;
+
+	for (; search < searchEnd; search+=ALIGNMENT) {
+		if (kmemcmp(search,RSDP_SIG,8)) {
+			return (RSDPLegacyDescriptor*)search;
+		}
 	}
 
 	return NULL; // Not found
 }
 
+Pair<uint8_t,void*> validate_rsdp() {
+	RSDPLegacyDescriptor* rsdp = find_rsdp();
+	if (rsdp->revision == 0) {
+		return {rsdp->revision,rsdp};
+	} else if (rsdp->revision == 2) {
+		return {rsdp->revision,(RSDPModernDescriptor*)rsdp};
+	}
+}

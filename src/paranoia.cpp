@@ -1,14 +1,15 @@
 #include <stdint.h>
 #include "terminal.h"
 #include "string.h"
-#include "const.h"
-#include "pit.h"
 #include "memory.h"
+#include "const.h"
 #include "types.h"
 #include "fail.h"
+#include "acpi.h"
 #include "gdt.h"
 #include "idt.h"
 #include "isr.h"
+#include "pit.h"
 
 // DRIVERS
 
@@ -97,6 +98,9 @@ extern "C" {
             Terminal::print(")\n\n");
         
         initIDT(idt);
+        if (find_rsdp() == NULL) {
+            fault(-500);
+        }
 
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));

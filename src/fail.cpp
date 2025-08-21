@@ -36,7 +36,7 @@ void stackTrace(unsigned int MaxFrames)
 
 void setError(int errno) {
 	if (errno == 1000) {
-		induceHang();
+		induceHalt();
 	} else {
 		error = errno;
 	}
@@ -136,6 +136,11 @@ void fault(int errno,char* string) {
 		Terminal::print("  Driver failure. (ps2keyboard)\n\n");
 
 		Terminal::print("  The PS/2 Keyboard driver failed to perform a task.");
+	}
+	if (errno == -500) {
+		Terminal::print("  ACPI failure.\n\n");
+
+		Terminal::print("  Failed to find the RSDP in the ACPI.");
 	}
 	setError(1000);
 }

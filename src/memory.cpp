@@ -38,6 +38,8 @@ namespace Allocator {
     static char* memory_pool = (char*)MEM_START;
 	static MBlock bitmap[NUM_BLOCKS];
 
+    char* str; // pointer if anything demands a pointer
+
     void init() {
         if ((NUM_BLOCKS%1) != 0) {
             setError(-2032);
@@ -99,7 +101,13 @@ namespace Allocator {
             }
         }
 
-        setError(-2026);
+        // Terminal::print(parseInt(blocksToAllocate,str,10));
+        // Terminal::print("\n");
+        // Terminal::print(parseInt(NUM_BLOCKS,str,10));
+
+        while (true) {};
+
+        setError(-102);
 
         return nullptr;
     }
@@ -150,4 +158,18 @@ int kmemcmp(const void* s1, const void* s2, size_t n) {
         }
     }
     return 0;
+}
+
+void* kmemcpy(void* dest, const void* src, size_t n) {
+    uint8_t* d = (uint8_t*)dest;
+    const uint8_t* s = (const uint8_t*)src;
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+    return dest;
+}
+
+void* phys_to_virt(uintptr_t phys) {
+    // Assume you have a direct 1:1 mapping for low memory or a known mapping region
+    return (void*)(phys + KERNEL_VIRTUAL_BASE); 
 }

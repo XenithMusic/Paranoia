@@ -110,6 +110,12 @@ void fault(int errno,char* string) {
 		Terminal::print("  Most programs will not run in this state, so it\n");
 		Terminal::print("  makes sense not to even try.");
 	}
+	if (errno == -102) {
+		Terminal::print("  Out of memory.\n\n");
+
+		Terminal::print("  The system has run out of memory, and could not\n");
+		Terminal::print("  continue execution.");
+	}
 	if (errno == -200) {
 		Terminal::print("  GDT parameters invalid.\n\n");
 

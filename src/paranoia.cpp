@@ -85,6 +85,16 @@ extern "C" {
             Terminal::print(" Terminal initialized.");
             Terminal::print("\n");
 
+        ACPITables rsdt = find_rsdt();
+
+        if (rsdt.isValid == false) {
+            if (rsdt.count == 0x00) {
+                fault(-500,"Fail 0x00");
+            } else {
+                fault(-500,"Unknown fail.");
+            }
+        }
+
         set_pit_count(0);
 
         Terminal::print("[TIME UNKNOWN]");
@@ -110,7 +120,7 @@ extern "C" {
         Terminal::print("\n:: DRIVERS (");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print(")\n\n");
-        PS2Returns response = ps2general::init();
+        PS2Returns response = ps2general::init((FADTTable*)find_sdt(&rsdt,"FACP"));
         if (response != Success) {
     //             NoPS2Controller,
     // PS2Timeout,

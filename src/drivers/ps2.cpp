@@ -35,9 +35,8 @@ namespace ps2general {
     const uint8_t ACK = 0xFA;
     const uint8_t TIMEOUT_PSEUDO = 0x00;
 
-    bool verifyPS2Controller() {
-        return true; // TODO: HACK: VERY BAD PRACTICE. CHANGE THIS AS SOON AS POSSIBLE.
-                     //             DO NOT ASSUME PS/2 CONTROLLER. MY HOST COMPUTER DOES NOT HAVE PS/2, AND WILL CRASH.
+    bool verifyPS2Controller(FADTTable* table) {
+        return (table->flags & 0x01) != 0x00;
     }
     void sendCommand(uint8_t command) {
         outb(COMMAND_PORT,command);
@@ -98,9 +97,9 @@ namespace ps2general {
         if (waitForReadReady(1000) == false) return TIMEOUT_PSEUDO;
         return inb(DATA_PORT);
     }
-    PS2Returns init() {
+    PS2Returns init(FADTTable* table) {
         cli();
-        if (not verifyPS2Controller()) {
+        if (not verifyPS2Controller(table)) {
             return NoPS2Controller;
         }
 

@@ -37,7 +37,7 @@ namespace ps2general {
     void sendCommand16(uint8_t first, uint8_t second);
     uint8_t sendCommandAck(uint8_t command);
     uint8_t fetchConfigurationByte();
-    PS2Returns init();
+    PS2Returns init(FADTTable* table);
 }
 
 namespace ps2keyboard {

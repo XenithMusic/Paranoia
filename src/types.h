@@ -529,16 +529,93 @@ struct ACPISTDHeader {
     uint32_t OEM_revision;
     uint32_t creator_id;
     uint32_t creator_revision;
-};
+} __attribute__((packed));
 
 struct RSDTDescriptor {
     ACPISTDHeader header;
-    uint32_t next_std[]; // variable length array of table pointers
-};
+    uint32_t other_std[]; // variable length array of table pointers
+} __attribute__((packed));
 
 struct XSDTDescriptor {
     ACPISTDHeader header;
-    uint64_t next_std[]; // variable length array of table pointers
+    uint64_t other_std[]; // variable length array of table pointers
+} __attribute__((packed));
+
+struct ACPITables {
+    bool isValid;
+    ACPISTDHeader header;
+    size_t count;
+    bool isXsdt;
+    uint64_t* entries;
+} __attribute__((packed));
+
+struct ACPI_generic_register_position {
+    uint8_t address_space;
+    uint8_t bit_width;
+    uint8_t bit_offset;
+    uint8_t access_size;
+    uint64_t address;
+};
+
+struct FADTTable {
+    ACPISTDHeader header;
+    uint32_t firmware_ctrl;
+    uint32_t dstd;
+    uint8_t reserved_0000; // used in acpi 1.0, for compatibility only. is ignored.
+    uint8_t preferred_power_management_profile;
+    uint16_t sci_interrupt;
+    uint32_t smi_command_port;
+    uint8_t acpi_enable;
+    uint8_t acpi_disable;
+    uint8_t s4_bios_req;
+    uint8_t pstate_control;
+    uint32_t pm1a_event_block;
+    uint32_t pm1b_event_block;
+    uint32_t pm1a_control_block;
+    uint32_t pm1b_control_block;
+    uint32_t pm2_control_block;
+    uint32_t pm_timer_block;
+    uint32_t gpe_0_block;
+    uint32_t gpe_1_block;
+    uint8_t pm1_event_length;
+    uint8_t pm1_control_length;
+    uint8_t pm2_control_length;
+    uint8_t pm_timer_length;
+    uint8_t gpe_0_length;
+    uint8_t gpe_1_length;
+    uint8_t gpe_1_base;
+    uint8_t c_state_control;
+    uint16_t worst_c2_latency;
+    uint16_t worst_c3_latency;
+    uint16_t flush_size;
+    uint16_t flush_stride;
+    uint8_t duty_offset;
+    uint8_t duty_width;
+    uint8_t day_alarm;
+    uint8_t month_alarm;
+    uint8_t century;
+
+    uint16_t boot_architecture_flags; // reserved in acpi 1.0, used since acpi 2.0
+
+    uint8_t reserved_0001;
+    uint32_t flags;
+
+    ACPI_generic_register_position reset_reg;
+
+    uint8_t reset_value;
+    uint8_t reserved_0002[3];
+
+    uint64_t x_firmwarecontrol;
+    uint64_t x_dsdt;
+
+    ACPI_generic_register_position x_pm1a_event_block;
+    ACPI_generic_register_position x_pm1b_event_block;
+    ACPI_generic_register_position x_pm1a_control_block;
+    ACPI_generic_register_position x_pm1b_control_block;
+    ACPI_generic_register_position x_pm2_control_block;
+    ACPI_generic_register_position x_pm_timer_block;
+    ACPI_generic_register_position x_gpe_0_block;
+    ACPI_generic_register_position x_gpe_1_block;
 };
 
 // 0000

@@ -169,7 +169,7 @@ void* kmemcpy(void* dest, const void* src, size_t n) {
     return dest;
 }
 
-void* phys_to_virt(uintptr_t phys) {
-    // Assume you have a direct 1:1 mapping for low memory or a known mapping region
-    return (void*)(phys + KERNEL_VIRTUAL_BASE); 
-}
+// void* phys_to_virt(uintptr_t phys) {
+//     // Assume you have a direct 1:1 mapping for low memory or a known mapping region
+//     return (void*)(phys + KERNEL_VIRTUAL_BASE); 
+// }

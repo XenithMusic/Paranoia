@@ -6,6 +6,7 @@
 #include "types.h"
 #include "fail.h"
 #include "acpi.h"
+#include "page.h"
 #include "gdt.h"
 #include "idt.h"
 #include "isr.h"
@@ -45,10 +46,8 @@ TODO:
     [X] Put the addresses of the ISR handlers in the appropiate descriptors (in the IDT)
 
 - PS/2 Keyboard Driver
-    [X] Interrupts working
-    [ ] Changing scancode sets
-    [X] Interrupts parsed
-    [X] Expose a "keys pressed" variable
+    BUG: Changing scancode sets doesn't work
+    TODO: Verify that the PS/2 Controller exists.
 
 */
 
@@ -56,8 +55,9 @@ extern "C" {
 
     char* str; // pointer if anything demands a pointer
 
-    void GDTinitialized(IDTEntry* idt);    
-    void kernel_main(multiboot_info* mbi) {
+    void GDTinitialized(IDTEntry* idt,multiboot_info_t* mbi);    
+    void PagingInitialized(IDTEntry* idt,multiboot_info_t* mbi);
+    void kernel_main(multiboot_info_t* mbi) {
         // Initialize GDT as the VERY FIRST THING YOU DO.
 
         GDTEntry* gdt = (GDTEntry*)0x1000; // Define GDT pointer at a fixed memory location
@@ -65,15 +65,21 @@ extern "C" {
         __attribute__((aligned(0x10))) 
         IDTEntry* idt = (IDTEntry*)((uint32_t)gdt + gdtpointer.limit + 1); // Define IDT pointer immediately following the GDT
         // Now that we have a GDT, we can continue kernel initialization.
-        GDTinitialized(idt);
+        GDTinitialized(idt,mbi);
     }
-    void GDTinitialized(IDTEntry* idt) {
+    void GDTinitialized(IDTEntry* idt,multiboot_info_t* mbi) {
+        Paging::initwkp(); // Initialize Paging as the VERY SECOND THING YOU DO.
+        PagingInitialized(idt,mbi);
+    }
+    void PagingInitialized(IDTEntry* idt,multiboot_info_t* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
 
         Allocator::init();
 
         // Backlog of pre-terminal init
         Terminal::init();
+        Terminal::setCursorConfig((0xE << 4) | 0xF);
+        Terminal::enableCursor();
         Terminal::print("\n:: CPU INIT\n\n");
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" GDT initialized.");
@@ -85,21 +91,27 @@ extern "C" {
             Terminal::print(" Terminal initialized.");
             Terminal::print("\n");
 
-        ACPITables rsdt = find_rsdt();
-
-        if (rsdt.isValid == false) {
-            if (rsdt.count == 0x00) {
-                fault(-500,"Fail 0x00");
-            } else {
-                fault(-500,"Unknown fail.");
-            }
-        }
+        // #warning "The RSDT is being replaced with NULL; VERY dangerous, and WILL result in unintended behavior."
+        // #warning "If you see this while compiling, PLEASE REPORT THIS AS A BUG."
 
         set_pit_count(0);
 
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" PIT reset, time is measured in seconds since this message.");
             Terminal::print("\n");
+
+        ACPITables rsdt = find_rsdt();
+        // ACPITables rsdt = {};
+
+        // if (rsdt.isValid == false) {
+        //     if (rsdt.count == 0x00) {
+        //         fault(-500,"Fail 0x00");
+        //     } else {
+        //         fault(-500,"Unknown fail.");
+        //     }
+        // } else {
+        //     Terminal::print("RSDT is valid.");
+        // }
 
         // INTERRUPTS
 
@@ -108,9 +120,6 @@ extern "C" {
             Terminal::print(")\n\n");
         
         initIDT(idt);
-        if (find_rsdp() == NULL) {
-            fault(-500);
-        }
 
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
@@ -169,7 +178,7 @@ extern "C" {
         // - create first task and notify the scheduler
 
         Terminal::print("System information:\n");
-        Terminal::print("KERNEL:             PARANOIA\n");
+        Terminal::print("KERNEL:               PARANOIA\n");
         Terminal::print("- VERSION:            ");
             Terminal::print(CONST_VERSION);
             Terminal::print("\n");
@@ -202,6 +211,26 @@ extern "C" {
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print(")\n\n");
 
+        #ifdef CONST_DEBUGGING
+        if (Paging::is_paging_enabled())
+            Terminal::print("[DEBUG CHECK] Paging is enabled.\n");
+        else {
+            Terminal::print("[DEBUG CHECK] Paging is disabled.\n");
+        }
+
+        Terminal::printdebug("Testing near memory...\n");
+        char* character = (char*)0x10000;
+        character[0] = 'A';
+        if (*character == 'A')
+            Terminal::printdebug("[DEBUG CHECK] Succeeded.\n");
+
+        // Terminal::printdebug("Testing far memory...\n");
+        // character = (char*)0x1000000;
+        // character[0] = 'A';
+        // if (*character == 'A')
+        //     Terminal::printdebug("[DEBUG CHECK] Succeeded. (PAGING IS DISABLED)\n");
+        #endif
+
         double lastTick;
         double tick;
 
@@ -209,7 +238,6 @@ extern "C" {
 
         while (1) {
             tick = get_pit_seconds();
-
             if (lastTick+0.01 < tick) {
                 lastTick = tick;
                 if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_CONTROL] and 
@@ -239,9 +267,10 @@ extern "C" {
                         }
                     }
                 }
-            }
-            if (ps2keyboard::state.state == EatingScancode)
                 ps2keyboard::processScancodes();
+            }
+            // if (ps2keyboard::state.state == EatingScancode)
+            //     ps2keyboard::processScancodes();
             // The OS runs here
             // Terminal::swapBuffers();
         }

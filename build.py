@@ -11,7 +11,8 @@ with open("Makefile","r") as f:
 
 constants = {
 	"CONST_VERSION":"\"indev-2025-01-24\"",
-    "CONST_DEBUGGING":"false"
+    "CONST_DEBUGGING":"false",
+    "BITS32":"true",
 }
 
 # dynamic constants
@@ -29,4 +30,4 @@ constants = "CONST=\"" + escape_shell_string(constants) + "\""
 print("\n\n\nCONSTANTS:",constants,"\n\n\n")
 print()
 
-os.system(f"make -B {constants} && qemu-system-i386 -s -cdrom paranoia.iso -boot d ")
+os.system(f"make -B {constants} && qemu-system-i386 -m 256M -s -cdrom paranoia.iso -boot d ")

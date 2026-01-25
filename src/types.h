@@ -1,4 +1,5 @@
 #include "stdint.h"
+#include "stddef.h"
 
 /*
 
@@ -12,6 +13,15 @@ You should have received a copy of the GNU General Public License along with Par
 
 */
 
+// #ifdef BITS64
+// typedef unsigned long long size_t;
+// #else
+// #ifdef BITS32
+// typedef unsigned int size_t;
+// #else
+// #error "I don't know if I should define size_t 32-bit or 64-bit!"
+// #endif
+// #endif
 
 #pragma once
 
@@ -28,13 +38,36 @@ typedef struct {
     uint32_t mmap_addr;
 } multiboot_info;
 
+// directly from chatgpt for testing to see if this is actually correct
+typedef struct {
+    uint32_t flags;        // bitfield
+    uint32_t mem_lower;
+    uint32_t mem_upper;
+    uint32_t boot_device;
+    uint32_t cmdline;
+    uint32_t mods_count;
+    uint32_t mods_addr;
+    uint32_t syms[4];
+    uint32_t mmap_length;
+    uint32_t mmap_addr;
+
+    // --- framebuffer info ---
+    uint32_t framebuffer_addr;     // physical address of framebuffer
+    uint32_t framebuffer_pitch;    // bytes per scanline
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    uint8_t  framebuffer_bpp;      // bits per pixel
+    uint8_t  framebuffer_type;     // 0=Indexed, 1=RGB, 2=EGA Text
+    uint8_t  reserved[2];          // padding
+} multiboot_info_t;
+
 enum MBlockState : char {
     USED = 0,
     FREE = 1,
     RSRV = 2
 };
 
-typedef struct MBlock {
+struct MBlock {
     bool isEnd = true; // if false, there is another block in this sequence.
     enum MBlockState state = RSRV;
 };
@@ -58,24 +91,38 @@ enum vga_color {
     VGA_COLOR_WHITE = 15,
 };
 
+enum PS2Returns {
+    NoPS2Controller,
+    PS2Timeout,
+    SelfTestFailure,
+    NoWorkingPorts,
+    Success,
+    NoAck,
+    UnexpectedState,
+};
 
 enum PS2_STATES {
     NoProcess,
     WaitingForAck,
+    Acked,
     EnablingScanning,
     WaitingForScancodes,
     EatingScancode,
     WaitingForPart,
+    Failure,
+    Unimplemented,
 };
 
 struct ps2stateMachine {
     PS2_STATES state = NoProcess;
-    uint8_t queueSize = 0;
-    uint64_t data[4] = {};
-    uint8_t stateInfo1 = 0;
-    uint8_t stateInfo2 = 0;
+    uint8_t lastScancode = 0; // formerly queueSize
+    uint8_t data[64] = {};
+    uint64_t currentData = 0;
+    uint8_t firstScancode = 0;
+    uint8_t flags = 0;
     uint8_t scancodeSet = 0x01;
     bool overwhelmed = 0;
+    bool ready = 1;
 };
 
 template <typename First,typename Second>
@@ -239,6 +286,12 @@ enum KeyCode {
 enum KeyMode {
     PRESSED,
     RELEASED
+};
+
+struct KeyAction {
+    bool initialized = false;
+    KeyCode code;
+    KeyMode mode;
 };
 
 const Pair<KeyCode,char> codesAscii[] = {
@@ -617,6 +670,74 @@ struct FADTTable {
     ACPI_generic_register_position x_gpe_0_block;
     ACPI_generic_register_position x_gpe_1_block;
 };
+
+// struct PageTableEntry {
+//     uint32_t address12 : 20;
+//     uint32_t avl : 3;
+//     uint32_t global : 1 = 0;
+//     uint32_t pat : 1 = 0;
+//     uint32_t dirty : 1 = 0;
+//     uint32_t accessed : 1 = 0;
+//     uint32_t cacheDisable : 1 = 0;
+//     uint32_t writeThrough : 1 = 0;
+//     uint32_t userSupervisor : 1 = 0;
+//     uint32_t writable : 1 = 0;
+//     uint32_t present : 1 = 0;
+// };
+
+// struct PageTableEntry {
+//     uint32_t present : 1 = 0;
+//     uint32_t writable : 1 = 0;
+//     uint32_t userSupervisor : 1 = 0;
+//     uint32_t writeThrough : 1 = 0;
+//     uint32_t cacheDisable : 1 = 0;
+//     uint32_t accessed : 1 = 0;
+//     uint32_t dirty : 1 = 0;
+//     uint32_t pat : 1 = 0;
+//     uint32_t global : 1 = 0;
+//     uint32_t avl : 3;
+//     uint32_t address12 : 20;
+// };
+
+typedef uint32_t PageTableEntry;
+
+struct PageTable {
+    PageTableEntry entries[1024];
+};
+
+typedef uint32_t PageDirectoryEntry;
+
+struct PageDirectory {
+    PageDirectoryEntry entries[1024] = {};
+};
+
+#define PTE_PRESENT   0x1
+#define PTE_WRITABLE  0x2
+#define PTE_USER      0x4
+#define PDE_BIGPAGE   0x80
+
+// struct PageDirectoryEntry {
+//     // 1 if in physical memory.
+//     uint32_t present : 1 = 0;
+//     // 1 is read/write, 0 is read only.
+//     uint32_t writable : 1 = 0;
+//     // Always acessable by the Supervisor. If 1, it is also accessable by the user.
+//     uint32_t userSupervisor : 1 = 0;
+//     // If 1, write-through caching is enabled.
+//     uint32_t writeThrough : 1 = 0;
+//     // If 0, caching is enabled.
+//     uint32_t cacheDisable : 1 = 0;
+//     // If a PDE or PTE wqas read during translation, this bit is set. This will not be cleared automatically.
+//     uint32_t accessed : 1 = 0;
+//     // Available for usage by the OS
+//     uint32_t avl1 : 1;
+//     // Always 0.
+//     uint32_t bigPage : 1 = 0;
+//     // Available for usage by the OS
+//     uint32_t avl : 4;
+//     // Upper 20 bits of the page table address.
+//     uint32_t address12 : 20;
+// };
 
 // 0000
 

@@ -1,13 +1,5 @@
 #include <stdint.h>
 #include "utils.h"
-enum PS2Returns {
-    NoPS2Controller,
-    PS2Timeout,
-    SelfTestFailure,
-    NoWorkingPorts,
-    Success,
-    NoAck,
-};
 
 namespace ps2general {
     const uint8_t COMMAND_PORT = 0x64;

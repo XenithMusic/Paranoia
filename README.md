@@ -5,8 +5,12 @@
 - [x] Does not trust user-space programs in the slightest.
 - [x] Memory Allocation (probably p bad, but it's good enough)
 - [x] Keeping track of time poorly
-- [X] Interrupt Descriptor Table
+- [x] Interrupt Descriptor Table
+- [x] Paging
 - [ ] Drivers
+  - [x] PS/2 Controller
+  - [x] PS/2 Keyboard
+    - BUG: Scancode sets are somewhat broken. I will fix them eventually. Probably.
 - [ ] Ext2 file system
 - [ ] System Call API
 - [ ] Executing other programs

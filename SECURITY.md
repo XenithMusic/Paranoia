@@ -12,4 +12,4 @@ Currently, no releases exist, and as such, we will only support source code. Thi
 
 Please report security vulnerabilities with Github Security Advisory's [Report a Vulnerability](https://github.com/XenithMusic/Paranoia/security/advisories/new) tab.
 
-Reported vulnerabilities will have status updates until a fix can be released. We may ask for additional information about the security vulnerability.
+Reported vulnerabilities will have status updates until a fix can be released. We may ask for additional information about the security vulnerability, so please keep an eye on it.

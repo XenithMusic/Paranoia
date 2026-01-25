@@ -2,7 +2,7 @@
 
 RSDPLegacyDescriptor* find_rsdp();
 
-Pair<uint8_t,void*> validate_rsdp();
+Pair<uint8_t,RSDPLegacyDescriptor*> validate_rsdp();
 
 ACPITables find_rsdt();
 

@@ -6,6 +6,7 @@
 #include "types.h"
 #include "fail.h"
 #include "acpi.h"
+#include "page.h"
 #include "gdt.h"
 #include "idt.h"
 #include "isr.h"
@@ -57,6 +58,7 @@ extern "C" {
     char* str; // pointer if anything demands a pointer
 
     void GDTinitialized(IDTEntry* idt);    
+    void PagingInitialized(IDTEntry* idt);
     void kernel_main(multiboot_info* mbi) {
         // Initialize GDT as the VERY FIRST THING YOU DO.
 
@@ -68,12 +70,18 @@ extern "C" {
         GDTinitialized(idt);
     }
     void GDTinitialized(IDTEntry* idt) {
+        Paging::initwkp(); // Initialize Paging as the VERY SECOND THING YOU DO.
+        PagingInitialized(idt);
+    }
+    void PagingInitialized(IDTEntry* idt) {
         // Set up basic environment (screen, interrupts, etc.)
 
         Allocator::init();
 
         // Backlog of pre-terminal init
         Terminal::init();
+        Terminal::setCursorConfig((0xE << 4) | 0xF);
+        Terminal::enableCursor();
         Terminal::print("\n:: CPU INIT\n\n");
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" GDT initialized.");
@@ -85,15 +93,19 @@ extern "C" {
             Terminal::print(" Terminal initialized.");
             Terminal::print("\n");
 
-        ACPITables rsdt = find_rsdt();
+        #warning "The RSDT is being replaced with NULL; VERY dangerous, and WILL result in unintended behavior."
+        #warning "If you see this while compiling, PLEASE REPORT THIS AS A BUG."
 
-        if (rsdt.isValid == false) {
-            if (rsdt.count == 0x00) {
-                fault(-500,"Fail 0x00");
-            } else {
-                fault(-500,"Unknown fail.");
-            }
-        }
+        // ACPITables rsdt = find_rsdt();
+        ACPITables rsdt = {};
+
+        // if (rsdt.isValid == false) {
+        //     if (rsdt.count == 0x00) {
+        //         fault(-500,"Fail 0x00");
+        //     } else {
+        //         fault(-500,"Unknown fail.");
+        //     }
+        // }
 
         set_pit_count(0);
 
@@ -202,6 +214,17 @@ extern "C" {
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print(")\n\n");
 
+        #ifdef CONST_DEBUGGING
+        if (Paging::is_paging_enabled())
+            Terminal::print("[DEBUG CHECK] Paging is enabled.\n");
+        else
+            Terminal::print("[DEBUG CHECK] Paging is disabled.\n");
+        char* character = (char*)0xE00000;
+        character[0] = 'A';
+        if (*character == 'A')
+            Terminal::print("[DEBUG CHECK] Write to far away memory worked\n");
+        #endif
+
         double lastTick;
         double tick;
 
@@ -240,8 +263,9 @@ extern "C" {
                     }
                 }
             }
-            if (ps2keyboard::state.state == EatingScancode)
-                ps2keyboard::processScancodes();
+            ps2keyboard::processScancodes();
+            // if (ps2keyboard::state.state == EatingScancode)
+            //     ps2keyboard::processScancodes();
             // The OS runs here
             // Terminal::swapBuffers();
         }

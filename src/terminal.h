@@ -17,6 +17,11 @@ You should have received a copy of the GNU General Public License along with Par
 
 namespace Terminal {
 
+    void enableCursor();
+    void disableCursor();
+    void updateCursorPos();
+    void setCursorConfig(uint8_t config);
+
     static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg);
 
     static inline uint16_t vga_entry(unsigned char uc, uint8_t color);

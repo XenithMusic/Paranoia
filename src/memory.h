@@ -36,11 +36,12 @@ namespace Allocator {
 
     void init();
 
-    void *malloc(size_t size);
+    void *kalloc(size_t size);
 
     void free(void* pointer);
 
 }
+void kmemset(void* start, char value, size_t length);
 int kmemcmp(const void* s1, const void* s2, size_t n);
 void* kmemcpy(void* dest, const void* src, size_t n);
 void* phys_to_virt(uintptr_t phys);

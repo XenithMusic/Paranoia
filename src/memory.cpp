@@ -23,7 +23,7 @@ You should have received a copy of the GNU General Public License along with Par
 #define BLOCK_SIZE 512 // 512B
 #define NUM_BLOCKS MEMORY_POOL_SIZE/BLOCK_SIZE // 512 MiB
 
-#define MEM_START (0x5*MEBIBYTES)
+#define MEM_START (0x9*MEBIBYTES)
 
 #if (NUM_BLOCKS%1) != 0
 #error "(-2032) NUM_BLOCKS should be an integer."
@@ -70,7 +70,7 @@ namespace Allocator {
         return BLOCK_SIZE;
     }
 
-    void *malloc(size_t size) {
+    void* kalloc(size_t size) {
         size_t blocksToAllocate = 1;
     	if (size > BLOCK_SIZE) {
             setError(-2028);
@@ -145,17 +145,20 @@ namespace Allocator {
     }
 }
 
+void kmemset(void* start, char value, size_t length) {
+    char* startChar = (char*)start;
+    for (size_t i = 0; i < length; i++) {
+        startChar[i] = value;
+    }
+}
+
 int kmemcmp(const void* s1, const void* s2, size_t n) {
     const uint8_t* p1 = (const uint8_t*)s1;
     const uint8_t* p2 = (const uint8_t*)s2;
 
     for (size_t i = 0; i < n; i++) {
-        if (p1[i] > p2[i]) {
-            return -1;
-        }
-        if (p1[i] > p2[i]) {
-            return 1;
-        }
+        if (p1[i] < p2[i]) return -1;
+        if (p1[i] > p2[i]) return 1;
     }
     return 0;
 }

@@ -49,4 +49,14 @@ SECTIONS
 
     /* The compiler may produce other sections, by default it will put them in
        a segment with the same name. Simply add stuff here as needed. */
+
+    .stack ALIGN(4K) : {
+        _stack_start = .;
+        . = . + 0x4000;
+        _stack_end = .;
+    }
+
+    .kernel_paging 0x600000 : {
+        KEEP(*(.kernel_paging))
+    }
 }

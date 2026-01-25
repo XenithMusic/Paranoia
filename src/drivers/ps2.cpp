@@ -2,15 +2,6 @@
 #include "utils.h"
 #include "fail.h"
 #include "string.h"
-enum PS2Returns {
-    NoPS2Controller,
-    PS2Timeout,
-    SelfTestFailure,
-    NoWorkingPorts,
-    Success,
-    NoAck,
-    UnexpectedState,
-};
 
 namespace ps2general {
     const uint8_t COMMAND_PORT = 0x64;
@@ -36,6 +27,7 @@ namespace ps2general {
     const uint8_t TIMEOUT_PSEUDO = 0x00;
 
     bool verifyPS2Controller(FADTTable* table) {
+        return true;
         return (table->flags & 0x01) != 0x00;
     }
     void sendCommand(uint8_t command) {
@@ -427,7 +419,6 @@ namespace ps2keyboard {
         if (state.data[0] == ps2general::ACK) {
             Terminal::printdebug("waitAck success!\n");
             state.data[0] = 0;
-            state.queueSize = 0;
             return Success;
         }
         Terminal::printdebug("waitAck got wrong value!\n0x");
@@ -527,6 +518,8 @@ namespace ps2keyboard {
     }
 
     PS2Returns init(bool portTwo) {
+        state.lastScancode = 0;
+        state.firstScancode = 0;
         sti();
         codeStore = changeScancodeSet(2);
         codeStore = changeScancodeSet(2);
@@ -556,7 +549,7 @@ namespace ps2keyboard {
     //                 // if (codeStore != Success) return codeStore;
     //                 state.state = WaitingForScancodes;
     //                 state.data[0] = 0;
-    //                 state.queueSize = 0;
+    //                 state.lastScancode = 0;
                     
     //                 return Success;
     //             }
@@ -568,47 +561,80 @@ namespace ps2keyboard {
     //     }
     // }
 
-    Pair<KeyCode,KeyMode> scancodeToKeycode(uint8_t set,uint64_t scancode) {
+    KeyAction scancodeToKeycode(uint8_t set,uint64_t scancode) {
         for (Pair<uint64_t,KeyCode> pair : set1codes) {
             if (scancode == pair.first) {
-                return {pair.second,PRESSED};
+                return {true,pair.second,PRESSED};
             }
             if (scancode-0x80 == pair.first) {
-                return {pair.second,RELEASED};
+                return {true,pair.second,RELEASED};
             }
         }
+        return {};
     }
 
     PS2Returns processScancodes() {
-        if (state.state == EatingScancode) {
-            // Terminal::printdebug("Scancode!\n");
-            // Terminal::printdebug("Scanned: ");
-            // Terminal::printdebug(parseInt(state.data[0],str,16));
-            // if (state.data[0] > 0xFF) {
-            //     Terminal::printdebug(" (this should be larger than 0xFF)");
-            // } // E0 2A E0 37    E0 B7 E0 AA
-            // if (state.data[0] == 0xE02AE037) {
-            //     Terminal::printdebug(" (prtsc pressed)");
-            // }
-            // if (state.data[0] == 0xE0B7E0AA) {
-            //     Terminal::printdebug(" (prtsc released)");
-            // }
-            // Terminal::printdebug("\n");
-            Pair<KeyCode,KeyMode> keypair = scancodeToKeycode(state.scancodeSet,state.data[0]);
-            keysDown[keypair.first] = keypair.second == PRESSED;
-            keysDown[MODIF_ANY_ALT] = keysDown[MODIF_LEFT_ALT] or keysDown[MODIF_RIGHT_ALT];
-            keysDown[MODIF_ANY_SHIFT] = keysDown[MODIF_LEFT_SHIFT] or keysDown[MODIF_RIGHT_SHIFT];
-            keysDown[MODIF_ANY_CONTROL] = keysDown[MODIF_LEFT_CONTROL] or keysDown[MODIF_RIGHT_CONTROL];
-            keysDown[MODIF_ANY_META] = keysDown[MODIF_LEFT_META] or keysDown[MODIF_RIGHT_META];
-            state.data[0] = state.data[1];
-            state.data[1] = state.data[2];
-            state.data[2] = state.data[3];
-            state.data[3] = 0;
-            state.queueSize--;
-            if (state.data[0] == 0x00) {
-                state.state = WaitingForScancodes;
-            }
+        if (!state.ready) {
+            return Success;
         }
+        if (state.state == Failure) {
+            fault(-402,"PS/2 Keyboard state set to Failure.");
+        }
+        if (state.state == Unimplemented) {
+            fault(-402,"PS/2 Keyboard state set to Unimplemented.");
+        }
+        uint8_t code = state.data[state.firstScancode];
+        if (state.firstScancode != state.lastScancode) {
+            state.currentData <<= 8;
+            state.currentData |= code;
+            state.data[state.firstScancode] = 0;
+            state.firstScancode++;
+        }
+        KeyAction action = scancodeToKeycode(state.scancodeSet,state.currentData);
+        if (!action.initialized) {
+            return UnexpectedState; // The scancode is incomplete or invalid.
+        }
+        keysDown[action.code] = action.mode == PRESSED;
+        keysDown[MODIF_ANY_ALT] = keysDown[MODIF_LEFT_ALT] or keysDown[MODIF_RIGHT_ALT];
+        keysDown[MODIF_ANY_SHIFT] = keysDown[MODIF_LEFT_SHIFT] or keysDown[MODIF_RIGHT_SHIFT];
+        keysDown[MODIF_ANY_CONTROL] = keysDown[MODIF_LEFT_CONTROL] or keysDown[MODIF_RIGHT_CONTROL];
+        keysDown[MODIF_ANY_META] = keysDown[MODIF_LEFT_META] or keysDown[MODIF_RIGHT_META];
+        state.state = WaitingForScancodes;
+        state.currentData = 0;
+
         return Success;
     }
+
+    // PS2Returns processScancodes() {
+    //     if (state.state == EatingScancode) {
+    //         // Terminal::printdebug("Scancode!\n");
+    //         // Terminal::printdebug("Scanned: ");
+    //         // Terminal::printdebug(parseInt(state.data[0],str,16));
+    //         // if (state.data[0] > 0xFF) {
+    //         //     Terminal::printdebug(" (this should be larger than 0xFF)");
+    //         // } // E0 2A E0 37    E0 B7 E0 AA
+    //         // if (state.data[0] == 0xE02AE037) {
+    //         //     Terminal::printdebug(" (prtsc pressed)");
+    //         // }
+    //         // if (state.data[0] == 0xE0B7E0AA) {
+    //         //     Terminal::printdebug(" (prtsc released)");
+    //         // }
+    //         // Terminal::printdebug("\n");
+    //         Pair<KeyCode,KeyMode> keypair = scancodeToKeycode(state.scancodeSet,state.data[0]);
+    //         keysDown[keypair.first] = keypair.second == PRESSED;
+    //         keysDown[MODIF_ANY_ALT] = keysDown[MODIF_LEFT_ALT] or keysDown[MODIF_RIGHT_ALT];
+    //         keysDown[MODIF_ANY_SHIFT] = keysDown[MODIF_LEFT_SHIFT] or keysDown[MODIF_RIGHT_SHIFT];
+    //         keysDown[MODIF_ANY_CONTROL] = keysDown[MODIF_LEFT_CONTROL] or keysDown[MODIF_RIGHT_CONTROL];
+    //         keysDown[MODIF_ANY_META] = keysDown[MODIF_LEFT_META] or keysDown[MODIF_RIGHT_META];
+    //         state.data[0] = state.data[1];
+    //         state.data[1] = state.data[2];
+    //         state.data[2] = state.data[3];
+    //         state.data[3] = 0;
+    //         state.lastScancode--;
+    //         if (state.data[0] == 0x00) {
+    //             state.state = WaitingForScancodes;
+    //         }
+    //     }
+    //     return Success;
+    // }
 }

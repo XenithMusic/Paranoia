@@ -3,6 +3,8 @@
 #include "types.h"
 #include "memory.h"
 #include "string.h"
+#include "page.h"
+
 #define EBDA_PTR 0x40E
 #define RSDP_SIG "RSD PTR "
 #define BIOS_START 0xE0000
@@ -33,45 +35,81 @@ bool verify_rsdp_checksum(RSDPLegacyDescriptor* rsdp) {
     return true;
 }
 
+void* find_signature(const void* signature, uint8_t* search, uint8_t* searchEnd) {
+	for (; search < searchEnd; search+=ALIGNMENT) {
+		if (kmemcmp(search,RSDP_SIG,8) == 0) {
+			if (verify_rsdp_checksum((RSDPLegacyDescriptor*)search)) {
+				// Terminal::print("Funden.\n");
+				return (RSDPLegacyDescriptor*)search;
+			}
+		}
+	}
+	return NULL;
+}
+
 RSDPLegacyDescriptor* find_rsdp() {
 	uint16_t EBDA = *(uint16_t*)EBDA_PTR;
 	uint32_t EBDA_TRUE = (uint32_t)EBDA << 4;
 	uint8_t* search = (uint8_t*)EBDA_TRUE;
 	uint8_t* searchEnd = search+1024;
 
-	for (; search < searchEnd; search+=ALIGNMENT) {
-		if (kmemcmp(search,RSDP_SIG,8) == 0) {
-			if (verify_rsdp_checksum((RSDPLegacyDescriptor*)search)) {
-				return (RSDPLegacyDescriptor*)search;
-			}
+	void* returned = find_signature(RSDP_SIG,search,searchEnd);
+
+	if (returned != NULL)
+
+		if (verify_rsdp_checksum((RSDPLegacyDescriptor*)returned)) {
+			return (RSDPLegacyDescriptor*)returned;
 		}
-	}
+
+	// for (; search < searchEnd; search+=ALIGNMENT) {
+	// 	if (kmemcmp(search,RSDP_SIG,8) == 0) {
+	// 		if (verify_rsdp_checksum((RSDPLegacyDescriptor*)search)) {
+	// 			// Terminal::print("Funden.\n");
+	// 			return (RSDPLegacyDescriptor*)search;
+	// 		}
+	// 	}
+	// }
 
 	search = (uint8_t*)BIOS_START;
 	searchEnd = (uint8_t*)BIOS_END;
 
-	for (; search < searchEnd; search+=ALIGNMENT) {
-		if (kmemcmp(search,RSDP_SIG,8) == 0) {
-			return (RSDPLegacyDescriptor*)search;
+	// for (; search < searchEnd; search+=ALIGNMENT) {
+	// 	if (kmemcmp(search,RSDP_SIG,8) == 0) {
+	// 		return (RSDPLegacyDescriptor*)search;
+	// 	}
+	// }
+
+	returned = find_signature(RSDP_SIG,search,searchEnd);
+
+	if (returned != NULL)
+
+		if (verify_rsdp_checksum((RSDPLegacyDescriptor*)returned)) {
+			return (RSDPLegacyDescriptor*)returned;
 		}
-	}
 
 	return NULL; // Not found
 }
 
-Pair<uint8_t,void*> validate_rsdp() {
+// Pair.first is the revision.
+// if (Pair.first == 0) {
+//		Pair.second is a pointer to a RSDPLegacyDescriptor
+// } else {
+// 		Pair.second is a pointer to a RSDPModernDescriptor
+// }
+Pair<uint8_t,RSDPLegacyDescriptor*> validate_rsdp() {
 	RSDPLegacyDescriptor* rsdp = find_rsdp();
 	if (rsdp == NULL) return {0x00,nullptr};
-	if (rsdp->revision == 0) {
-		return {rsdp->revision,rsdp};
-	} else if (rsdp->revision == 2) {
-		return {rsdp->revision,(RSDPModernDescriptor*)rsdp};
-	}
-	return {0x01,nullptr};
+	return {rsdp->revision,rsdp}; // expected to cast manually.
+	// if (rsdp->revision >= 0) {
+	// 	return {rsdp->revision,rsdp};
+	// } else {
+	// 	return {rsdp->revision,rsdp};
+	// }
+	// return {0x01,nullptr};
 }
 
 ACPITables find_rsdt() {
-	Pair<uint8_t,void*> rsdp = validate_rsdp();
+	Pair<uint8_t,RSDPLegacyDescriptor*> rsdp = validate_rsdp();
 
 	ACPITables table;
 	table.isValid = true;
@@ -81,20 +119,35 @@ ACPITables find_rsdt() {
 		return table;
 	}
 
-	if (rsdp.first == 0) {
+	// Terminal::print(parseInt(rsdp.second->checksum,stratus,16));
+
+	if (rsdp.first >= 2) {
+		XSDTDescriptor* xsdt = (XSDTDescriptor*)((RSDPModernDescriptor*)(rsdp.second))->xsdt_address;
+		table.header = xsdt->header;
+		size_t count = (table.header.length-sizeof(ACPISTDHeader))/sizeof(uint64_t);
+		table.count = count;
+		table.isXsdt = true;
+		table.entries = xsdt->other_std;
+	} else {
+		RSDPLegacyDescriptor* descriptor = (RSDPLegacyDescriptor*)rsdp.second;
 		// assert((((RSDPLegacyDescriptor*)(rsdp.second))->rsdt_address) != 0);
 		// Terminal::print(parseInt((int)rsdp.second,stratus,16));
-		uint32_t phys = ((RSDPLegacyDescriptor*)rsdp.second)->rsdt_address;
+		uint32_t phys = descriptor->rsdt_address;
+		Paging::mapIdentityRange(&Paging::kernelPD,phys,sizeof(RSDTDescriptor));
 		RSDTDescriptor* rsdt = nullptr;
 
 		// Early protected mode without paging, assuming A20 enabled:
 		rsdt = (RSDTDescriptor*)(uintptr_t)phys;
+		Terminal::print(parseInt(phys,stratus,16));
 		table.header = rsdt->header;
 		size_t count = (table.header.length-sizeof(ACPISTDHeader))/sizeof(uint32_t);
 		table.count = count;
 		table.isXsdt = false;
-		Terminal::print(parseInt(table.header.length,stratus,10));
-		table.entries = (uint64_t*)Allocator::malloc(count*sizeof(uint64_t));
+		// char* sig = descriptor->signature;
+		// sig[7] = '\0';
+		// Terminal::print(sig);
+		// Terminal::print("\n\n\nMaking sure it SHOULD show something");
+		table.entries = (uint64_t*)Allocator::kalloc(count*sizeof(uint64_t));
 		// if (getError() == -102) {
 		// 	fault(-102,"While finding RSDT in ACPI.");
 		// }
@@ -102,13 +155,6 @@ ACPITables find_rsdt() {
 			table.entries[i] = (uint64_t)rsdt->other_std[i];
 		}
 		// table.entries = ...whatever it is
-	} else {
-		XSDTDescriptor* xsdt = (XSDTDescriptor*)((RSDPModernDescriptor*)(rsdp.second))->xsdt_address;
-		table.header = xsdt->header;
-		size_t count = (table.header.length-sizeof(ACPISTDHeader))/sizeof(uint64_t);
-		table.count = count;
-		table.isXsdt = true;
-		table.entries = xsdt->other_std;
 	}
 	return table;
 }

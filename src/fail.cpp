@@ -116,6 +116,9 @@ void fault(int errno,char* string) {
 		Terminal::print("  The system has run out of memory, and could not\n");
 		Terminal::print("  continue execution.");
 	}
+	if (errno == -102) {
+		Terminal::print("  Unspecified allocation failure.");
+	}
 	if (errno == -200) {
 		Terminal::print("  GDT parameters invalid.\n\n");
 
@@ -147,6 +150,21 @@ void fault(int errno,char* string) {
 		Terminal::print("  ACPI failure.\n\n");
 
 		Terminal::print("  Failed to find the RSDP in the ACPI.");
+	}
+	if (errno == -600) {
+		Terminal::print("  Fault from userspace.\n\n");
+
+		Terminal::print("  Refer to extra information.");
+	}
+	if (errno == -700) {
+		Terminal::print("  Invalid page table index.\n\n");
+
+		Terminal::print("  Attempted to map or access an invalid page.");
+	}
+	if (errno == -701) {
+		Terminal::print("  Paging was initialized twice.\n\n");
+
+		Terminal::print("  This is guaranteed to be a bug. Please report this.");
 	}
 	setError(1000);
 }

@@ -174,9 +174,10 @@ void fault(int errno) {
 }
 
 void warn(char* string) {
-	Terminal::print("The following message may be important in the future:\n");
+	Terminal::print("Something in the Kernel emitted a warning:\n");
 	Terminal::print("  ");
 	Terminal::print(string);
+	Terminal::print("\n");
 }
 
 

@@ -38,13 +38,36 @@ typedef struct {
     uint32_t mmap_addr;
 } multiboot_info;
 
+// directly from chatgpt for testing to see if this is actually correct
+typedef struct {
+    uint32_t flags;        // bitfield
+    uint32_t mem_lower;
+    uint32_t mem_upper;
+    uint32_t boot_device;
+    uint32_t cmdline;
+    uint32_t mods_count;
+    uint32_t mods_addr;
+    uint32_t syms[4];
+    uint32_t mmap_length;
+    uint32_t mmap_addr;
+
+    // --- framebuffer info ---
+    uint32_t framebuffer_addr;     // physical address of framebuffer
+    uint32_t framebuffer_pitch;    // bytes per scanline
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    uint8_t  framebuffer_bpp;      // bits per pixel
+    uint8_t  framebuffer_type;     // 0=Indexed, 1=RGB, 2=EGA Text
+    uint8_t  reserved[2];          // padding
+} multiboot_info_t;
+
 enum MBlockState : char {
     USED = 0,
     FREE = 1,
     RSRV = 2
 };
 
-typedef struct MBlock {
+struct MBlock {
     bool isEnd = true; // if false, there is another block in this sequence.
     enum MBlockState state = RSRV;
 };
@@ -81,6 +104,7 @@ enum PS2Returns {
 enum PS2_STATES {
     NoProcess,
     WaitingForAck,
+    Acked,
     EnablingScanning,
     WaitingForScancodes,
     EatingScancode,

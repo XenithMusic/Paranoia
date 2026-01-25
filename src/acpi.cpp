@@ -37,7 +37,7 @@ bool verify_rsdp_checksum(RSDPLegacyDescriptor* rsdp) {
 
 void* find_signature(const void* signature, uint8_t* search, uint8_t* searchEnd) {
 	for (; search < searchEnd; search+=ALIGNMENT) {
-		if (kmemcmp(search,RSDP_SIG,8) == 0) {
+		if (kmemcmp(search,signature,8) == 0) {
 			if (verify_rsdp_checksum((RSDPLegacyDescriptor*)search)) {
 				// Terminal::print("Funden.\n");
 				return (RSDPLegacyDescriptor*)search;
@@ -48,7 +48,7 @@ void* find_signature(const void* signature, uint8_t* search, uint8_t* searchEnd)
 }
 
 RSDPLegacyDescriptor* find_rsdp() {
-	uint16_t EBDA = *(uint16_t*)EBDA_PTR;
+	uint16_t EBDA = *(volatile uint16_t*)EBDA_PTR;
 	uint32_t EBDA_TRUE = (uint32_t)EBDA << 4;
 	uint8_t* search = (uint8_t*)EBDA_TRUE;
 	uint8_t* searchEnd = search+1024;
@@ -133,12 +133,13 @@ ACPITables find_rsdt() {
 		// assert((((RSDPLegacyDescriptor*)(rsdp.second))->rsdt_address) != 0);
 		// Terminal::print(parseInt((int)rsdp.second,stratus,16));
 		uint32_t phys = descriptor->rsdt_address;
-		Paging::mapIdentityRange(&Paging::kernelPD,phys,sizeof(RSDTDescriptor));
+		// Paging::mapIdentityRange(&Paging::kernelPD,phys,sizeof(RSDTDescriptor));
 		RSDTDescriptor* rsdt = nullptr;
 
 		// Early protected mode without paging, assuming A20 enabled:
 		rsdt = (RSDTDescriptor*)(uintptr_t)phys;
 		Terminal::print(parseInt(phys,stratus,16));
+		return {};
 		table.header = rsdt->header;
 		size_t count = (table.header.length-sizeof(ACPISTDHeader))/sizeof(uint32_t);
 		table.count = count;

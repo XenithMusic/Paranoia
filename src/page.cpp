@@ -3,6 +3,8 @@
 #include "fail.h"
 #include "memory.h"
 
+#define PAGE_TABLE_COUNT 128
+
 namespace Paging {
     bool enabled = false;
     // the basic page directory for the kernel
@@ -85,7 +87,7 @@ namespace Paging {
     // I DO NOT WANT TO EVER HAVE TO WRITE THAT AGAIN SOB
     PageDirectory* initwkp() {
         // 4 page tables for the kernel
-        static PageTable kernelPTs[4] alignas(4096); // 4 x 4MiB = 16MiB
+        static PageTable kernelPTs[PAGE_TABLE_COUNT] alignas(4096); // 4 x 4MiB = 16MiB
 
         // Clear page directory
         for (int i = 0; i < 1024; i++) {
@@ -93,12 +95,12 @@ namespace Paging {
         }
 
         // Fill page tables with identity mapping
-        for (int t = 0; t < 4; t++) {
-            for (int i = 0; i < 1024; i++) {
-                kernelPTs[t].entries[i] = (i + t*1024) * 0x1000 | 3; // Present + RW
+        for (int pageTable = 0; pageTable < PAGE_TABLE_COUNT; pageTable++) {
+            for (int pageNumber = 0; pageNumber < 1024; pageNumber++) {
+                kernelPTs[pageTable].entries[pageNumber] = (pageNumber + pageTable*1024) * 0x1000 | 3; // Present + RW
             }
             // Point PD entry to this PT
-            kernelPD.entries[t] = ((uint32_t)&kernelPTs[t]) | 3; // Present + RW
+            kernelPD.entries[pageTable] = ((uint32_t)&kernelPTs[pageTable]) | 3; // Present + RW
         }
 
         // Activate paging

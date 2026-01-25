@@ -26,9 +26,10 @@ namespace ps2general {
     const uint8_t ACK = 0xFA;
     const uint8_t TIMEOUT_PSEUDO = 0x00;
 
+    const uint32_t PS2_PRESENT_FLAG = 0x01;
+
     bool verifyPS2Controller(FADTTable* table) {
-        return true;
-        return (table->flags & 0x01) != 0x00;
+        return (table->flags & PS2_PRESENT_FLAG) != 0x00;
     }
     void sendCommand(uint8_t command) {
         outb(COMMAND_PORT,command);
@@ -137,7 +138,7 @@ namespace ps2general {
         sendCommand(ENABLE_PORT_2);
         config = fetchConfigurationByte();
         bool dualChannel = false;
-        if (config & 0b00010000 == 0) {
+        if ((config & 0b00010000) == 0) {
             dualChannel = true;
             sendCommand(DISABLE_PORT_2);
         }
@@ -520,6 +521,7 @@ namespace ps2keyboard {
     PS2Returns init(bool portTwo) {
         state.lastScancode = 0;
         state.firstScancode = 0;
+        state.ready = true;
         sti();
         codeStore = changeScancodeSet(2);
         codeStore = changeScancodeSet(2);
@@ -570,13 +572,10 @@ namespace ps2keyboard {
                 return {true,pair.second,RELEASED};
             }
         }
-        return {};
+        return {false};
     }
 
     PS2Returns processScancodes() {
-        if (!state.ready) {
-            return Success;
-        }
         if (state.state == Failure) {
             fault(-402,"PS/2 Keyboard state set to Failure.");
         }
@@ -587,8 +586,8 @@ namespace ps2keyboard {
         if (state.firstScancode != state.lastScancode) {
             state.currentData <<= 8;
             state.currentData |= code;
-            state.data[state.firstScancode] = 0;
-            state.firstScancode++;
+            // state.data[state.firstScancode] = 0;
+            state.firstScancode = (state.firstScancode+1)%64;
         }
         KeyAction action = scancodeToKeycode(state.scancodeSet,state.currentData);
         if (!action.initialized) {

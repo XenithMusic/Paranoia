@@ -94,6 +94,7 @@ $(KERNEL): $(OBJ_FILES)
 $(ISO_IMAGE): $(KERNEL)
 	mkdir -p $(ISO_DIR)/boot/grub
 	cp $(KERNEL) $(ISO_DIR)/boot/
+	cp filesystem/* iso
 	cd iso
 	$(GRUB) -o $(ISO_IMAGE) $(ISO_DIR)
 	cd ..

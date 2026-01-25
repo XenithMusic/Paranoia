@@ -173,6 +173,12 @@ void fault(int errno) {
 	fault(errno,nullptr);
 }
 
+void warn(char* string) {
+	Terminal::print("The following message may be important in the future:\n");
+	Terminal::print("  ");
+	Terminal::print(string);
+}
+
 
 
 

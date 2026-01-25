@@ -11,7 +11,7 @@ with open("Makefile","r") as f:
 
 constants = {
 	"CONST_VERSION":"\"indev-2025-01-24\"",
-    "CONST_DEBUGGING":"true",
+    "CONST_DEBUGGING":"false",
     "BITS32":"true",
 }
 

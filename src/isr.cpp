@@ -56,20 +56,18 @@ extern "C" {
         }
         uint8_t scancode = inb(0x60);
         auto &st = ps2keyboard::state;
-        st.ready = false;
         if (st.state == WaitingForScancodes or st.state == EatingScancode) {
             st.state = EatingScancode;
-            st.lastScancode = (st.lastScancode+1)%64;
             st.data[st.lastScancode] = scancode;
+            st.lastScancode = (st.lastScancode+1)%64;
         } else if (st.state == WaitingForAck) {
             if (scancode == 0xFA) {
                 st.state = NoProcess;
-                st.data[0] = scancode;
+                st.data[0] = scancode; // BUG: This overwrites state.data.
             } else if (scancode == 0xFE) {
                 st.state = Failure;
             }
         }
-        st.ready = true;
         eoi(1);
         return;
     }

@@ -1,4 +1,9 @@
 #include "terminal.h"
+#include "string.h"
+#include "pit.h"
+#include "ps2.h"
+#include "acpi.h"
+#include "fail.h"
 
 /*
 
@@ -12,25 +17,14 @@ You should have received a copy of the GNU General Public License along with Par
 
 */
 
+enum DriverReturn {
+    SUCCESS,
+    FAILURE
+};
 
-void setError(int errno);
-void assert(bool dontcrash);
-int getError();
-void clearError();
-void fault(int errno,char* string,char* source);
-void fault(int errno,char* string);
-void fault(int errno);
+namespace drivermanager {
+    DriverReturn init(ACPITables* rsdt);
+}
 
-
-
-// DEPRECATED
-
-void panic(int errno,char* string);
-// introduced in indev-2024-11-23
-// deprecated in indev-2024-11-23
-// superceded by fault(int, char*)
-
-void panic(int errno);
-// introduced in indev-2024-11-23
-// deprecated in indev-2024-11-23
-// superceded by fault(int, char*)
+namespace drivers {
+}

@@ -1,0 +1,19 @@
+#!/bin/bash
+# this should be running as sudo.
+
+# mount filesystem
+echo "[build_filesystem] Mounting filesystem."
+
+mkdir -p /mnt/paranoia_fs
+mount -o loop filesystem.img /mnt/paranoia_fs
+
+# fill
+
+echo "[build_filesystem] Filling filesystem."
+cp -ar filesystem/* /mnt/paranoia_fs
+
+# unmount
+
+echo "[build_filesystem] Unmounting filesystem."
+sync
+umount /mnt/paranoia_fs

@@ -14,7 +14,7 @@
 
 // DRIVERS
 
-#include "drivers/ps2.h"
+#include "drivers/driverman.h"
 
 /*
 
@@ -129,44 +129,8 @@ extern "C" {
         Terminal::print("\n:: DRIVERS (");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print(")\n\n");
-        PS2Returns response = ps2general::init((FADTTable*)find_sdt(&rsdt,"FACP"));
-        if (response != Success) {
-    //             NoPS2Controller,
-    // PS2Timeout,
-    // SelfTestFailure,
-    // NoWorkingPorts,
-    // Success,
-    // NoAck,
-            if (response == NoPS2Controller) {
-                fault(-401,"No PS/2 controller found.)");
-            } else if (response == PS2Timeout) {
-                fault(-401,"Timed out while waiting for a response.");
-            } else if (response == SelfTestFailure) {
-                fault(-401,"PS/2 Controller reported a failure during self-test.");
-            } else if (response == NoWorkingPorts) {
-                fault(-401,"PS/2 Controller has no working ports.");
-            } else {
-                fault(-401);
-            }
-        }
-        Terminal::print("[");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] Initialized PS/2 Driver.");
-            Terminal::print("\n");
-        response = ps2keyboard::init(false);
-        if (response != Success) {
-            if (response == PS2Timeout) {
-                fault(-402,"Timed out while waiting for a response.\n         (is the controller unresponsive?)");
-            } else if (response == NoAck) {
-                fault(-402,"Something should've been acknowledged, but wasn't.");
-            } else {
-                fault(-402);
-            }
-        }
-        Terminal::print("[");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] Initialized PS/2 Keyboard.");
-            Terminal::print("\n");
+        
+        drivermanager::init(&rsdt);
 
         Terminal::print("\n:: SERVICES (");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));

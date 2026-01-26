@@ -58,7 +58,7 @@ void clearError() {
 	error = 0;
 }
 
-void fault(int errno,char* string) {
+void fault(int errno,char* string,char* source) {
 	cli(); // prevent interrupts causing unexpected fault exiting
 	char* str;
 	Terminal::init();
@@ -73,6 +73,11 @@ void fault(int errno,char* string) {
 	if (string != nullptr) {
 	Terminal::print("  Extra: ");
 		Terminal::print(string);
+		Terminal::print("\n");
+	}
+	if (source != nullptr) {
+	Terminal::print("  Source: ");
+		Terminal::print(source);
 		Terminal::print("\n");
 	}
 	Terminal::print("  Stack Trace:\n\n");
@@ -136,15 +141,37 @@ void fault(int errno,char* string) {
 
 		Terminal::print("  Something went wrong in a driver!");
 	}
-	if (errno == -401) {
-		Terminal::print("  Driver failure. (ps2general)\n\n");
 
+	// deprecated in indev-2026-01-25
+	// superceded by errno -403, -404, and -405
+	if (errno == -401) {
+		Terminal::print("  Driver failure. (ps2general)\n");
+		Terminal::print("    (this is a deprecated error.)\n");
 		Terminal::print("  The PS/2 Controller driver failed to perform a task.");
 	}
-	if (errno == -402) {
-		Terminal::print("  Driver failure. (ps2keyboard)\n\n");
 
+	// deprecated in indev-2026-01-25
+	// superceded by errno -403, -404, and -405
+	if (errno == -402) {
+		Terminal::print("  Driver failure. (ps2keyboard)\n");
+		Terminal::print("    (this is a deprecated error.)\n");
 		Terminal::print("  The PS/2 Keyboard driver failed to perform a task.");
+	}
+
+	if (errno == -403) {
+		Terminal::print("  Mandatory Driver Failure.\n\n");
+
+		Terminal::print("  A driver mandatory for Boot failed to perform a task.");
+	}
+	if (errno == -404) {
+		Terminal::print("  Driver Failure.\n\n");
+
+		Terminal::print("  A driver failed to perform a task.");
+	}
+	if (errno == -405) {
+		Terminal::print("  Extension Driver Failure.\n\n");
+
+		Terminal::print("  An extension driver failed to perform a task.");
 	}
 	if (errno == -500) {
 		Terminal::print("  ACPI failure.\n\n");
@@ -169,8 +196,12 @@ void fault(int errno,char* string) {
 	setError(1000);
 }
 
+void fault(int errno,char* string) {
+	fault(errno,nullptr,nullptr);
+}
+
 void fault(int errno) {
-	fault(errno,nullptr);
+	fault(errno,nullptr,nullptr);
 }
 
 void warn(char* string) {

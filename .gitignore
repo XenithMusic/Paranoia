@@ -1,5 +1,6 @@
 *.bin
 *.iso
+*.img
 *.log
 *.o
 *.code-workspace

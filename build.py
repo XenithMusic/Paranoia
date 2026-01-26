@@ -42,4 +42,26 @@ constants = "CONST=\"" + escape_shell_string(constants) + "\""
 print("\n\n\nCONSTANTS:",constants,"\n\n\n")
 print()
 
-os.system(f"make -B {constants} && qemu-system-i386 -m 256M -s -cdrom paranoia.iso -boot d ")
+# make iso
+os.system(f"make -B {constants}")
+# && qemu-img create -f qcow2 -b paranoia.iso -o backing_fmt=raw paranoia.img 512M && \
+# qemu-system-i386 -m 256M -s -drive file=paranoia.img,format=qcow2,media=disk -boot c")
+
+# make filesystem
+print("[build] Making filesystem...")
+print("- dd")
+os.system("dd if=/dev/zero of=filesystem.img bs=1M count=496 conv=sparse")
+print("- mkfs")
+os.system("mkfs.ext2 filesystem.img")
+os.system("sudo ./build_filesystem")
+
+# make img
+print("[build] Making image...")
+print("- qemu-img")
+os.system("qemu-img create -f qcow2 -b paranoia.iso -o backing_fmt=raw paranoia.img 512M")
+print("- dd")
+os.system("dd if=filesystem.img of=paranoia.img bs=1M seek=16 conv=notrunc,sparse")
+
+# run
+print("[build] Running!")
+os.system("qemu-system-i386 -m 256M -s -drive file=paranoia.img,format=qcow2,media=disk -boot c")

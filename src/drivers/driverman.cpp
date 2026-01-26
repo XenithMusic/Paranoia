@@ -1,9 +1,10 @@
 #include "terminal.h"
 #include "string.h"
-#include "pit.h"
-#include "ps2.h"
 #include "acpi.h"
 #include "fail.h"
+#include "pit.h"
+#include "ps2.h"
+#include "ata.h"
 
 /*
 
@@ -29,15 +30,15 @@ namespace drivermanager {
         Terminal::print("[drivermanager::init @ ");
             Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
             Terminal::print("] Initializing mandatory drivers...\n\n");
-        PS2Returns response = ps2general::init((FADTTable*)find_sdt(rsdt,"FACP"));
-        if (response != Success) {
-            if (response == NoPS2Controller) {
+        PS2Returns response_ps2 = ps2general::init((FADTTable*)find_sdt(rsdt,"FACP"));
+        if (response_ps2 != Success) {
+            if (response_ps2 == NoPS2Controller) {
                 fault(-403,"No PS/2 controller found.","PS/2 Controller");
-            } else if (response == PS2Timeout) {
+            } else if (response_ps2 == PS2Timeout) {
                 fault(-403,"Timed out while waiting for a response.","PS/2 Controller");
-            } else if (response == SelfTestFailure) {
+            } else if (response_ps2 == SelfTestFailure) {
                 fault(-403,"Controller Self-Test failure.","PS/2 Controller");
-            } else if (response == NoWorkingPorts) {
+            } else if (response_ps2 == NoWorkingPorts) {
                 fault(-403,"No working ports.","PS/2 Controller");
             } else {
                 fault(-403,nullptr,"PS/2 Controller");
@@ -49,14 +50,12 @@ namespace drivermanager {
             Terminal::print("\n");
         
         
-        response = ps2keyboard::init(false);
-        if (response != Success) {
-            if (response == PS2Timeout) {
+        response_ps2 = ps2keyboard::init(false);
+        if (response_ps2 != Success) {
+            if (response_ps2 == PS2Timeout) {
                 fault(-403,"Timed out while waiting for a response.\n         (is the controller unresponsive?)","PS/2 Keyboard");
-            } else if (response == NoAck) {
+            } else if (response_ps2 == NoAck) {
                 fault(-403,"Something should've been acknowledged, but wasn't.","PS/2 Keyboard");
-            } else if (response == Failure) {
-                fault(-403,"Something went wrong.","PS/2 Keyboard");
             } else {
                 fault(-403,nullptr,"PS/2 Controller");
             }
@@ -65,7 +64,58 @@ namespace drivermanager {
             Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
             Terminal::print("] Initialized PS/2 Keyboard.");
             Terminal::print("\n");
-        return SUCCESS;
+        
+        disk_ata::ATAState response_ata = disk_ata::init();
+        if (response_ata != disk_ata::SUCCESS) {
+            if (response_ata == disk_ata::OUT_OF_BOUNDS) {
+                fault(-403,"Out of bounds.","ATA Hard Drive");
+            } else {
+                fault(-403,nullptr,"ATA Hard Drive");
+            }
+        }
+        Terminal::print("[");
+            Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
+            Terminal::print("] Initialized ATA Driver.");
+            Terminal::print("\n");
+        Terminal::print("ATA read demo: ");
+        response_ata = disk_ata::read_sector(0xF000000/512,disk_ata::ATADrive::MASTER);
+        if (response_ata != disk_ata::SUCCESS) {
+            if (response_ata == disk_ata::OUT_OF_BOUNDS) {
+                fault(-403,"Out of bounds.","ATA Hard Drive");
+            } else{
+                fault(-403,nullptr,"ATA Hard Drive");
+            }
+        }
+        uint8_t* buffer = disk_ata::get_buffer();
+        Terminal::print(parseInt(buffer[0],throwawayString,16));
+        uint8_t writeBuffer[512] = {};
+        writeBuffer[0] = 0x7f;
+        response_ata = disk_ata::write_sector(0xF000000/512,writeBuffer,disk_ata::ATADrive::MASTER);
+        if (response_ata != disk_ata::SUCCESS) {
+            if (response_ata == disk_ata::OUT_OF_BOUNDS) {
+                fault(-403,"Out of bounds.","ATA Hard Drive");
+            } else if (response_ata == disk_ata::TIMEOUT) {
+                fault(-403,"Timeout","ATA Hard Drive");
+            } else {
+                fault(-403,nullptr,"ATA Hard Drive");
+            }
+        }
+        response_ata = disk_ata::read_sector(0xF000000/512,disk_ata::ATADrive::MASTER);
+        if (response_ata != disk_ata::SUCCESS) {
+            if (response_ata == disk_ata::OUT_OF_BOUNDS) {
+                fault(-403,"Out of bounds.","ATA Hard Drive");
+            } else{
+                fault(-403,nullptr,"ATA Hard Drive");
+            }
+        }
+        buffer = disk_ata::get_buffer();
+        Terminal::print("\nATA write demso: ");
+        Terminal::print(parseInt(buffer[0],throwawayString,16));
+        Terminal::print("\n");
+        if (buffer[0] == 0x7F) {
+            Terminal::print("\nWRITE SUCCESS\n");
+        }
+        return DriverReturn::SUCCESS;
     }
 }
 

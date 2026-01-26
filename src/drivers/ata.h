@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stddef.h>
-
 /*
 
 Copyright (C) 2026  XenithMusic (on github)
@@ -13,22 +12,23 @@ You should have received a copy of the GNU General Public License along with Par
 
 */
 
-extern "C" {
-	void cli();
-	void sti();
-	bool checkInterrupts();
-	void io_wait();
+namespace disk_ata {
+    enum ATAState {
+        SUCCESS = 0,
+        FAILURE,
+        OUT_OF_BOUNDS,
+        NO_DRIVE,
+        BAD_DRIVE,
+        TIMEOUT
+    };
+    
+    enum ATADrive {
+        MASTER = 0xA0,
+        SLAVE = 0xB0
+    };
 
-	void interrupt(uint8_t num);
-
-	void outb(uint16_t port, uint8_t val);
-	uint8_t inb(uint16_t port);
-	void outw(uint16_t port, uint16_t val);
-	void outsw(uint16_t port, void* buffer, size_t count);
-	uint16_t inw(uint16_t port);
-
-	void interrupt(uint8_t vector);
-
-	void induceHang();
-	void induceHalt();
+    uint8_t* get_buffer();
+    ATAState read_sector(size_t sector, ATADrive drive);
+    ATAState write_sector(size_t sector,uint8_t* buffer, ATADrive drive);
+    ATAState init();
 }

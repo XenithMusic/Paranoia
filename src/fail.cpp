@@ -98,6 +98,11 @@ void fault(int errno,char* string,char* source) {
 		Terminal::print("  The error that has occurred was not specified, so Paranoia cannot be sure\n");
 		Terminal::print("  that it is safe to continue running code.\n");
 	}
+	if (errno == 2) {
+		Terminal::print("  Unimplemented.\n\n");
+
+		Terminal::print("  Read 'extra' under FAULT INFO for more details.");
+	}
 	if (errno == 1) {
 		Terminal::print("  This is a generic errno.\n\n");
 

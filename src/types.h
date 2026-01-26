@@ -30,6 +30,19 @@ struct spinlock_t {
     void* resource;
 };
 
+struct DriverInfo {
+    int8_t priority;
+    char ident[8];
+
+    void* preinitFunction = nullptr;
+    void* initFunction; // required
+    void* postinitFunction = nullptr;
+    
+    void* preiterFunction = nullptr;
+    void* iterFunction = nullptr;
+    void* postiterFunction = nullptr;
+};
+
 typedef struct {
     uint32_t flags;
     uint32_t mem_lower;

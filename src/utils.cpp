@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 #include "terminal.h"
 
 /*
@@ -38,6 +39,18 @@ extern "C" {
 		__asm__ __volatile__ ("outb %0, %1" : : "a" (val), "Nd" (port));
 	}
 
+	void outw(uint16_t port, uint16_t val) {
+		__asm__ __volatile__ ("outw %0, %1" : : "a" (val), "Nd" (port));
+	}
+
+	void outsw(uint16_t port, void* buffer, size_t count) {
+		__asm__ __volatile__(
+			"rep outsw"
+			: "+S"(buffer), "+c"(count)
+			: "d"(port)
+		);
+	}
+
 	void io_wait() {
 		// dummy i/o operation
 		outb(0x80, 0);
@@ -55,6 +68,12 @@ extern "C" {
 	uint8_t inb(uint16_t port) {
 		uint8_t val;
 		__asm__ __volatile__ ("inb %1, %0" : "=a" (val) : "Nd" (port));
+		return val;
+	}
+
+	uint16_t inw(uint16_t port) {
+		uint16_t val;
+		__asm__ __volatile__ ("inw %1, %0" : "=a" (val) : "Nd" (port));
 		return val;
 	}
 	void induceHalt();

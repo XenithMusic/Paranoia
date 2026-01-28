@@ -25,6 +25,13 @@ You should have received a copy of the GNU General Public License along with Par
 
 #pragma once
 
+typedef uint64_t ubyte8_t;
+typedef uint32_t ubyte4_t;
+typedef uint16_t ubyte2_t;
+typedef uint8_t ubyte1_t;
+
+typedef ubyte1_t ubyte_t;
+
 struct spinlock_t {
     bool locked;
     void* resource;
@@ -84,6 +91,210 @@ struct MBlock {
     bool isEnd = true; // if false, there is another block in this sequence.
     enum MBlockState state = RSRV;
 };
+
+namespace ext2 {
+    enum FilesystemState : ubyte2_t {
+        CLEAN = 0x01,
+        ERRORS = 0x02
+    };
+    enum ErrorHandler : ubyte2_t {
+        // Ignore the errors.
+        SKIP = 0x01,
+        // Remount the file system as read-only.
+        READONLY = 0x02,
+        // Immediately trigger a Kernel Panic.
+        FAULT = 0x03
+    };
+    enum OSIdentifier : ubyte4_t {
+        LINUX = 0,
+        HURD = 1,
+        MASIX = 2,
+        FREEBSD = 3,
+        LITE = 4,
+        PARANOID = 5,
+    };
+    // 17 ubyte4
+    // 6 ubyte2
+    // 
+    struct Superblock {
+        ubyte4_t total_inodes;
+        ubyte4_t total_blocks;
+        // Blocks reserved for superuser.
+        ubyte4_t super_blocks;
+        // Unallocated blocks
+        ubyte4_t unall_blocks;
+        // Unallocated inodes
+        ubyte4_t unall_inodes;
+        // Quoted directly from the osdev wiki:
+        // Block number of the block containing the superblock (also the starting block number, NOT always zero.)
+        // 
+        // not sure what this means. will figure out later.
+        ubyte4_t superblock_no;
+        // This is not actually the block size; the block size can be optained with 1024 << this value
+        ubyte4_t block_size;
+        // This is not actually the fragment size; the fragment size can be optained with 1024 << this value
+        ubyte4_t frag_size;
+        // Number of blocks in a group
+        ubyte4_t group_blocks;
+        // Number of fragments in a group
+        ubyte4_t group_frags;
+        // Number of inodes in a group
+        ubyte4_t group_inodes;
+        // Last mount time. (since unix epoch)
+        ubyte4_t last_mount;
+        // Last write time. (since unix epoch)
+        ubyte4_t last_write;
+        // Number of mounts since the last consistency check.
+        ubyte2_t mounts_since_fsck;
+        // Number of mounts until a consistency check must be done.
+        ubyte2_t mounts_to_fsck;
+
+        // Should be 0xEF53. If it is not, this is not a valid ext2 filesystem.
+        ubyte2_t signature;
+
+        FilesystemState fs_state;
+
+        ErrorHandler err_handler;
+
+        ubyte2_t version_minor;
+
+        // Last consistency check (since unix epoch)
+        ubyte4_t last_fsck;
+        // Interval between consistency checks (in seconds)
+        ubyte4_t fsck_interval;
+
+        // ID of the OS which created this volume.
+        OSIdentifier os_creator;
+
+        ubyte4_t version_major;
+
+        // User ID that can use reserved blocks.
+        ubyte2_t super_user;
+        // Group ID that can use reserved blocks.
+        ubyte2_t super_group;
+    } __attribute__((packed));
+
+    struct BlockGroupDescriptor {
+        // Address in blocks.
+        ubyte4_t block_usage_addr;
+        // Address in blocks.
+        ubyte4_t inode_usage_addr;
+        // Address in blocks.
+        ubyte4_t inode_table_addr;
+        ubyte2_t no_unallocated_blocks;
+        ubyte2_t no_unallocated_inodes;
+        ubyte2_t no_directories;
+        ubyte1_t reserved[14];
+    } __attribute__((packed));
+    struct Inode {
+        /**
+         * Types and permissions.
+         * 
+         * 0x0FFF represent the permissions.
+         * 0xF000 represent the types.
+         * 
+         * Permissions:
+         * 0x1 = Other (execute)
+         * 0x2 = Other (write)
+         * 0x4 = Other (read)
+         * 0x8 = Group (execute)
+         * 0x10 = Group (write)
+         * 0x20 = Group (read)
+         * 0x40 = User (execute)
+         * 0x80 = User (write)
+         * 0x100 = User (read)
+         * 0x200 = Sticky Bit
+         * 0x400 = Set Group ID
+         * 0x800 = Set User ID
+         * 
+         * Types:
+         * 0x1000 = FIFO
+         * 0x2000 = Character device
+         * 0x4000 = Directory
+         * 0x6000 = Block device
+         * 0x8000 = Regular file
+         * 0xA000 = Symbolic link
+         * 0xC000 = Unix socket
+         */
+        ubyte2_t types_permissions;
+        // poor name, sorry, dunno what this means. maybe the owner?
+        ubyte2_t user_id;
+        ubyte4_t lower_size;
+        // (since unix epoch)
+        ubyte4_t last_access;
+        // Creation Time (since unix epoch)
+        ubyte4_t first_write;
+        // (since unix epoch)
+        ubyte4_t last_modify;
+        // (since unix epoch)
+        ubyte4_t deletion_time;
+        // poor name, sorry, dunno what this means. same as with user_id. maybe the owner?
+        ubyte2_t group_id;
+        // how many paths directly refer here
+        ubyte2_t hard_links;
+        // how many disk sectors are in use by this inode
+        ubyte4_t disk_sectors;
+        /**
+         * 0x1 = Secure deletion (unused)
+         * 0x2 = Keep a copy of data when deleted (unused)
+         * 0x4 = File compression (unused)
+         * 0x8 = Synchronous updates -- new data is immediately written
+         * 0x10 = Immutable file (read-only)
+         * 0x20 = Append only
+         * 0x40 = File is not included in 'dump' command
+         * 0x80 = Last accessed time should not update -- Frozen in time
+         * ... reserved
+         * 0x10000 = Hash indexed directory
+         * 0x20000 = AFS directory
+         * 0x40000 = Journal file data
+         */
+        ubyte4_t flags;
+        /**
+         * OS specific value.
+         * Linux: reserved
+         * HURD: "Translator"?
+         * MASIX: reserved
+         * 
+         * Paranoia: reserved
+         */
+        ubyte4_t os1;
+        ubyte4_t direct_pointers[12];
+        ubyte4_t pointer_single_indirect;
+        ubyte4_t pointer_double_indirect;
+        ubyte4_t pointer_triple_indirect;
+        // not sure what this does. "primarily used for nfs"?
+        ubyte4_t generation_number;
+        ubyte4_t extended_attribute_block;
+        ubyte4_t upper_size;
+        ubyte4_t fragment_address;
+        /**
+         * OS specific value.
+         * 
+         * Reference [https://wiki.osdev.org/Ext2#Inodes] for meanings on Linux, HURD, and MASIX.
+         * 
+         * Paranoia: reserved
+         */
+        ubyte4_t os2[3];
+    } __attribute__((packed));
+    enum DirectoryEntryType : ubyte1_t {
+        UNKNOWN = 0,
+        FILE,
+        DIRECTORY,
+        DEV_CHAR,
+        DEV_BLOCK,
+        FIFO,
+        SOCKET,
+        LINK_SOFT
+    };
+    struct DirectoryEntry {
+        ubyte4_t inode;
+        ubyte2_t total_size;
+        ubyte1_t name_len;
+        DirectoryEntryType type;
+        // maximum length is literally just 256 cuz i'm too lazy to make a large name implementation
+        char name[];
+    } __attribute__((packed));
+}
 
 enum vga_color {
     VGA_COLOR_BLACK = 0,

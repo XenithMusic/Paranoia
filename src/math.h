@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License along with Par
 extern "C" {
     int floor(double x);
     int ceil(double x);
+    int min(int a, int b);
+    int max(int a, int b);
     double pow(double x, int i);
     double ln(double x);
     double log_b(double x, double b);

@@ -204,9 +204,4 @@ namespace disk_ata {
         driverEnabled = true;
         return SUCCESS;
     }
-    DriverInfo discover() {
-        DriverInfo info{};
-        info.initFunction = (void*)init;
-        return info;
-    }
 }

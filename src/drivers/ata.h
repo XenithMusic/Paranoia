@@ -1,5 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
+
+#pragma once
 /*
 
 Copyright (C) 2026  XenithMusic (on github)

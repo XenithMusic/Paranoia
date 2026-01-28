@@ -17,7 +17,7 @@ CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o isras.o syscall.o driver_ps2ctl.o driver_disk_ata.o driverman.o pic.o acpi.o page.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o isras.o syscall.o driver_ps2ctl.o driver_disk_ata.o driver_fs_ext2.o driverman.o pic.o acpi.o page.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -87,6 +87,9 @@ driver_ps2ctl.o: src/drivers/ps2.cpp
 driver_disk_ata.o: src/drivers/ata.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
+driver_fs_ext2.o: src/drivers/ext2.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 driverman.o: src/drivers/driverman.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -100,7 +103,6 @@ $(KERNEL): $(OBJ_FILES)
 $(ISO_IMAGE): $(KERNEL)
 	mkdir -p $(ISO_DIR)/boot/grub
 	cp $(KERNEL) $(ISO_DIR)/boot/
-	cp -r filesystem/* iso
 	cd iso
 	$(GRUB) -o $(ISO_IMAGE) $(ISO_DIR)
 	cd ..

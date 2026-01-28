@@ -198,6 +198,11 @@ void fault(int errno,char* string,char* source) {
 
 		Terminal::print("  This is guaranteed to be a bug. Please report this.");
 	}
+	if (errno == -800) {
+		Terminal::print("  Faulting Disk drive has errors.\n\n");
+
+		Terminal::print("  A disk drive with an error mode set to 'Fault' is not clean.\n\n");
+	}
 	setError(1000);
 }
 

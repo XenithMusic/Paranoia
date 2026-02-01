@@ -172,6 +172,24 @@ namespace ext2 {
         ubyte2_t super_user;
         // Group ID that can use reserved blocks.
         ubyte2_t super_group;
+
+        ubyte4_t first_free_inode;
+        ubyte2_t inode_size;
+        ubyte2_t block_group;
+        ubyte4_t optional_features;
+        ubyte4_t required_features;
+        ubyte4_t writeable_features;
+        ubyte8_t filesystem_id[2];
+        char volume_name[16];
+        char path_vol_last_mount[64];
+        ubyte4_t compress_algorithm;
+        ubyte_t file_early_blocks;
+        ubyte_t dir_early_blocks;
+        ubyte2_t reserved;
+        ubyte8_t journal_id[2];
+        ubyte4_t journal_inode;
+        ubyte4_t journal_device;
+        ubyte4_t head_orphans;
     } __attribute__((packed));
 
     struct BlockGroupDescriptor {
@@ -670,54 +688,90 @@ enum syscall_fail {
 };
 
 enum syscall_id {
-    SCALL_REQKERNEL = 100,
-    SCALL_REQELEVATE = 101,
-    SCALL_BOOSTTRUST = 102,
-    SCALL_EXIT = 200,
-    SCALL_PLACE = 201,
-    SCALL_WAITPLACED = 202,
-    SCALL_KILL = 203, // RE
-    SCALL_ME = 204,
-    SCALL_WHO = 205,
-    SCALL_CHANGERUDE = 206,
-    SCALL_SIGNAL = 207,
-    SCALL_FETCHFILE = 300,
-    SCALL_SETINTENT = 301,
-    SCALL_READ = 302,
-    SCALL_REPLACE = 303, // EC
-    SCALL_APPEND = 304, // EC
-    SCALL_DELETEFILE = 305, // RE
-    SCALL_CREATEFILE = 306,
-    SCALL_COPY = 307,
-    SCALL_MOUNTFS = 308,
-    SCALL_EJECTFS = 309, // RE
-    SCALL_FSINFO = 310,
-    SCALL_SLEEP = 400,
-    SCALL_GETFAIL = 401,
-    SCALL_YIELD = 402,
-    SCALL_NETDEAD = 500,
-    SCALL_NETCON = 501,
-    SCALL_NETKILL = 502,
-    SCALL_NETBIND = 503, // EC
-    SCALL_NETACCEPT = 504,
-    SCALL_NETSEND = 505,
-    SCALL_NETRECV = 506,
-    SCALL_NETINFO = 507,
-    SCALL_DNSRES = 508,
-    SCALL_DNSLOCAL = 509,
-    SCALL_NETFIREWALL = 600, // RE
-    SCALL_NETMONITOR = 601, // RE
-    SCALL_GETNETMONITOR = 602, // RE
-    SCALL_SETFILEPERM = 603, // RE
-    SCALL_GETFILEPERM = 604,
-    SCALL_MALLOC = 700,
-    SCALL_MFREE = 701,
-    SCALL_MINFO = 702,
-    SCALL_LISTDEVICES = 800,
-    SCALL_UPTIME = 900,
-    SCALL_SHUTDOWN = 901, // EC
-    SCALL_RESTART = 902, // EC
-    SCALL_SUSPEND = 903 // EC
+    exit = 0x00,
+    info,
+    askNice,
+    elevateU,
+    elevateK,
+    start,
+    nice,
+    kill,
+    tell,
+    hear,
+    trace,
+    setgroup,
+    malloc = 0x10,
+    free,
+    mperm,
+    mgetperms,
+    yield = 0x20,
+    sleep,
+    fopen = 0x30,
+    fmode,
+    read,
+    write,
+    finfo,
+    mkdir = 0x35,
+    sync,
+    fclose,
+    RESERVED_34,
+    unlink,
+    sym,
+    hard,
+    seek,
+    chperm,
+    sinceboot = 0x60,
+    beep,
+    kinfo = 0x70,
+    rinfo
+    // SCALL_REQKERNEL = 100,
+    // SCALL_REQELEVATE = 101,
+    // SCALL_BOOSTTRUST = 102,
+    // SCALL_EXIT = 200,
+    // SCALL_PLACE = 201,
+    // SCALL_WAITPLACED = 202,
+    // SCALL_KILL = 203, // RE
+    // SCALL_ME = 204,
+    // SCALL_WHO = 205,
+    // SCALL_CHANGERUDE = 206,
+    // SCALL_SIGNAL = 207,
+    // SCALL_FETCHFILE = 300,
+    // SCALL_SETINTENT = 301,
+    // SCALL_READ = 302,
+    // SCALL_REPLACE = 303, // EC
+    // SCALL_APPEND = 304, // EC
+    // SCALL_DELETEFILE = 305, // RE
+    // SCALL_CREATEFILE = 306,
+    // SCALL_COPY = 307,
+    // SCALL_MOUNTFS = 308,
+    // SCALL_EJECTFS = 309, // RE
+    // SCALL_FSINFO = 310,
+    // SCALL_SLEEP = 400,
+    // SCALL_GETFAIL = 401,
+    // SCALL_YIELD = 402,
+    // SCALL_NETDEAD = 500,
+    // SCALL_NETCON = 501,
+    // SCALL_NETKILL = 502,
+    // SCALL_NETBIND = 503, // EC
+    // SCALL_NETACCEPT = 504,
+    // SCALL_NETSEND = 505,
+    // SCALL_NETRECV = 506,
+    // SCALL_NETINFO = 507,
+    // SCALL_DNSRES = 508,
+    // SCALL_DNSLOCAL = 509,
+    // SCALL_NETFIREWALL = 600, // RE
+    // SCALL_NETMONITOR = 601, // RE
+    // SCALL_GETNETMONITOR = 602, // RE
+    // SCALL_SETFILEPERM = 603, // RE
+    // SCALL_GETFILEPERM = 604,
+    // SCALL_MALLOC = 700,
+    // SCALL_MFREE = 701,
+    // SCALL_MINFO = 702,
+    // SCALL_LISTDEVICES = 800,
+    // SCALL_UPTIME = 900,
+    // SCALL_SHUTDOWN = 901, // EC
+    // SCALL_RESTART = 902, // EC
+    // SCALL_SUSPEND = 903 // EC
 };
 
 enum ps2device {

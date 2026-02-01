@@ -62,7 +62,7 @@ print("[build] Making filesystem...")
 print("- dd")
 os.system("dd if=/dev/zero of=filesystem.img bs=1M count=448 conv=sparse")
 print("- mkfs")
-os.system("mkfs.ext2 filesystem.img")
+os.system("mkfs.ext2 -O ^has_journal,^ext_attr,^resize_inode,^dir_index,^filetype filesystem.img")
 os.system("sudo ./build_filesystem")
 
 # make img

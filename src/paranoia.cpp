@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "terminal.h"
+#include "syscall.h"
 #include "string.h"
 #include "memory.h"
 #include "const.h"

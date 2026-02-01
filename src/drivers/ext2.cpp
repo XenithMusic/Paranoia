@@ -176,53 +176,51 @@ namespace ext2 {
         }
         return SUCCESS;
     }
+    // Inode* get_inode_table(size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table) {
+    //     // FATAL: This is completely non-functional, and yields garbage.
+    //     return (Inode*)table_addr;
+    // }
     /**
-     * Returns the Inode Table.
+     * Returns the Inode Table's address for a certain BlockGroupDescriptor.
      * 
      * Address is in blocks.
      * 
      * Returns:
-     * - Inode* always.
+     * - ubyte4_t / uint32_t always.
      */
-    Inode* get_inode_table(size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table) {
-        // FATAL: This is completely non-functional, and yields garbage.
-        size_t group = (address-1)/superblock->group_inodes;
-        size_t table_addr = bgd_table[group].inode_table_addr;
-        return (Inode*)table_addr;
+    ubyte4_t get_inode_table_address(size_t group,BlockGroupDescriptor* bgd_table) {
+        ubyte4_t table_addr = bgd_table[group].inode_table_addr;
+        return table_addr;
     }
     /**
-     * Returns an Inode.
+     * Returns an Inode, and writes it to ubuffer.
      * 
      * Warning:
      * - Make sure the type (inode->types_permissions&0xF000) is not 0.
      * - This will not fail on an invalid inode.
-     * 
-     * Returns:
-     * - Inode* always.
      */
-    Inode* get_inode(size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table) {
-        Inode* inodetable = get_inode_table(address,superblock,bgd_table);
-        size_t index = (address-1)%superblock->group_inodes;
-        Inode* inode = inodetable+index;
-        return inode;
-    }
-    /**
-     * Reads a block from an Inode.
-     * 
-     * BUG: This does not work for the 13th block or above, because indirect blocks have not been handled.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     */
-    ExtState read_inode_data(size_t blockIndex, Inode* inode, Superblock* superblock) {
-        if (blockIndex > 11) { // BUG: Does not work with indirect blocks.
-            fault(2,"Indirect blocks are not supported yet. Pain.","ext2 Filesystem (internal)");
-        }
-        return read_block(inode->direct_pointers[blockIndex],superblock->block_size);
-    }
+    void get_inode(Inode* ubuffer, size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table) {
+        size_t index = address-1;
+        size_t per_group = superblock->group_inodes;
+        size_t group = index/per_group;
+        size_t offset = index%per_group;
 
+        ubyte4_t inode_table_base = get_inode_table_address(group,bgd_table)*block_size;
+
+        size_t inode_size = sizeof(Inode); // this assumes that the Inode struct is sized correctly.
+        if (superblock->version_major >= 1) {
+            if (superblock->required_features != 0) {
+                fault(-403,"Unsupported Required Features","ext2 Filesystem");
+            }
+            inode_size = superblock->inode_size;
+        }
+        size_t inode_offset = offset*inode_size;
+        size_t inode_addr = inode_table_base + inode_offset;
+        size_t inode_block = inode_addr/block_size;
+        size_t inode_block_offset = inode_addr%block_size;
+        read_block(inode_block,block_size);
+        kmemcpy(ubuffer,buffer+inode_block_offset,inode_size);
+    }
     /**
      * Returns a directory entry notating the child of a directory.
      * 
@@ -239,12 +237,14 @@ namespace ext2 {
         // BUG: THIS WILL NOT WORK WITH DIRECTORIES THAT NEED MORE THAN 1 BLOCKS. THIS COULD BREAK WITH AS LOW AS 3 CHILDREN.
         //
         //       ...theoretically it could be 1, however names longer than 255 characters are not permitted
-        Inode* parent = get_inode(parentAddress,superblock,bgd_table);
+        Inode* parent;
+        get_inode(parent,parentAddress,superblock,bgd_table);
         for (size_t block = 0; block < 5; block++) {
+            if (parent->direct_pointers[block] == 0) break;
             Terminal::print("ADDRESS: ");
                 Terminal::print(parseInt(parent->direct_pointers[block],throwawayString,16));
                 Terminal::print("\n");
-            ExtState response = read_inode_data(block,parent,superblock);
+            ExtState response = read_block(parent->direct_pointers[block],block_size);
             if (response != SUCCESS) {
                 return {response,0};
             }
@@ -254,15 +254,17 @@ namespace ext2 {
             while (offset < block_size) {
                 currentDirectory = (DirectoryEntry*)((ubyte_t*)directories + offset);
                 if (currentDirectory->inode != 0) {
-                    Terminal::print("inode name_len total_size: ");
+                    Terminal::print("inode name_len total_size name: ");
                         Terminal::print(parseInt(currentDirectory->inode,throwawayString,16));
                         Terminal::print(" ");
                         Terminal::print(parseInt(currentDirectory->name_len,throwawayString,16));
                         Terminal::print(" ");
                         Terminal::print(parseInt(currentDirectory->total_size,throwawayString,16));
+                        Terminal::print(" ");
+                        Terminal::print((currentDirectory->name));
                         Terminal::print("\n");
                     if (currentDirectory->name_len == strlen(name) and
-                    kmemcmp(name,currentDirectory->name,currentDirectory->name_len)) {
+                        kmemcmp(name,currentDirectory->name,currentDirectory->name_len) == 0) {
                         return {SUCCESS,currentDirectory->inode};
                     }
                 }
@@ -274,6 +276,39 @@ namespace ext2 {
         }
         return {NOT_FOUND,0};
     }
+    /**
+     * Reads a block from an Inode.
+     * 
+     * BUG: This does not work for the 13th block or above, because indirect blocks have not been handled.
+     * 
+     * Returns:
+     * - SUCCESS
+     * - UNALIGNED (blockSize is not aligned to the sector size.)
+     * - LARGE (blockSize is larger than the maximum allowed block size.)
+     */
+    ExtState read_inode_block(size_t blockIndex, Inode* inode, Superblock* superblock) {
+        if (blockIndex > 12) {
+            fault(2,"LAZY (ext2.read_inode_block)");
+        } else {
+            size_t block = inode->direct_pointers[blockIndex];
+            read_block(block,block_size);
+            return SUCCESS;
+        }
+        return FAILURE;
+    }
+    /**
+     * Finds an inode with a given path on the disk.
+     * 
+     * Returns:
+     * - Pair<ExtState,DirectoryEntry>
+     * 
+     * ExtState:
+     * - SUCCESS
+     * - UNALIGNED (blockSize is not aligned to the sector size.)
+     * - LARGE (blockSize is larger than the maximum allowed block size.)
+     * - BAD_PATH (path is formatted incorrectly.)
+     */
+    // Pair<ExtState,DirectoryEntry> find_path()
     /**
      * Reads the superblock from the disk.
      * There is no version of this function that will not write a Superblock buffer to a user-specified pointer.

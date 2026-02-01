@@ -36,7 +36,7 @@ namespace Terminal {
 
     void putEntryAt(char c, uint8_t color, size_t x, size_t y);
 
-    void putChar(char c);
+    void putChar(char c,bool moveCursor);
     void write(const char* c,size_t size);
     void print(const char* str);
     void printdebug(const char* str);

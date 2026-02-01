@@ -118,16 +118,13 @@ namespace ext2 {
      */
     Inode* get_inode_table(size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table);
     /**
-     * Returns an Inode.
+     * Returns an Inode, and writes it to ubuffer.
      * 
      * Warning:
      * - Make sure the type (inode->types_permissions&0xF000) is not 0.
      * - This will not fail on an invalid inode.
-     * 
-     * Returns:
-     * - Inode* always.
      */
-    Inode* get_inode(size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table);
+    void get_inode(Inode* ubuffer, size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table);
     /**
      * Reads a block an Inode.
      * 
@@ -138,8 +135,7 @@ namespace ext2 {
      * - UNALIGNED (blockSize is not aligned to the sector size.)
      * - LARGE (blockSize is larger than the maximum allowed block size.)
      */
-    ExtState read_inode_data(size_t blockIndex, Inode* inode, Superblock* superblock);
-
+    ExtState read_inode_block(size_t blockIndex, Inode* inode, Superblock* superblock);
     /**
      * Returns a directory entry notating the child of a directory.
      * 

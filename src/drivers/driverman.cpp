@@ -147,6 +147,7 @@ namespace drivermanager {
         }
         Terminal::print("have bgd\n");
         Pair<ext2::ExtState,ubyte4_t> child = ext2::get_child("demo",2,&superblock,bgd_table);
+        // while(1) {}
         if (child.first != ext2::SUCCESS) {
             if (child.first == ext2::NOT_FOUND) {
                 fault(-403,"demo 3: not found","ext2 Filesystem");
@@ -155,7 +156,7 @@ namespace drivermanager {
         }
         Terminal::print("have child\n");
         Pair<ext2::ExtState,ubyte4_t> child2 = ext2::get_child("file.txt",child.second,&superblock,bgd_table);
-        while(true);
+        // while(true);
         if (child2.first != ext2::SUCCESS) {
             if (child2.first == ext2::NOT_FOUND) {
                 fault(-403,"demo 4: not found","ext2 Filesystem");
@@ -163,21 +164,21 @@ namespace drivermanager {
             fault(-403,"demo 4","ext2 Filesystem");
         }
         Terminal::print("have file\n");
-        ext2::Inode* inode2 = ext2::get_inode(child2.second,&superblock,bgd_table);
-        response_ext2 = ext2::read_inode_data(0,inode2,&superblock);
+        ext2::Inode* inode2;
+        ext2::get_inode(inode2,child2.second,&superblock,bgd_table);
+        response_ext2 = ext2::read_inode_block(0,inode2,&superblock);
+        // while(1){}
         if (response_ext2 != ext2::SUCCESS) {
             fault(-403,"demo 5","ext2 Filesystem");
         }
-        char character = 32;
-        response_ext2 = ext2::get_buffer(1,&character);
+        char characters[inode2->lower_size];
+        response_ext2 = ext2::get_buffer(inode2->lower_size,&characters);
         if (response_ext2 != ext2::SUCCESS) {
             fault(-403,"demo 6","ext2 Filesystem");
         }
-        Terminal::print("FIRST CHAR:");
-            Terminal::print(parseInt(inode2->direct_pointers[0]>>16,throwawayString,16));
-            Terminal::print(":");
-            Terminal::print(parseInt(offsetof(ext2::Inode,direct_pointers),throwawayString,16));
-            Terminal::print("\n");
+        for (int i=0;i < inode2->lower_size;i++) {
+            Terminal::putChar(characters[i],true);
+        }
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
             Terminal::print("] Initialized ext2 Filesystem Driver.");

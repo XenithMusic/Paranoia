@@ -86,6 +86,7 @@ extern "C" {
 	}
 	void induceHalt() {
 		Terminal::print("\n\n( System halted. )\n");
+		cli();
 		__asm__ __volatile__ ("hlt");
 		Terminal::print("\n\nSystem escaped from halt state, hanging.");
 		induceHang();

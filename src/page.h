@@ -34,5 +34,7 @@ namespace Paging {
     // Maps an identity page at a physical address.
     void mapIdentityPage(PageDirectory* pd, uint32_t phys);
     void mapIdentityRange(PageDirectory* pd, uintptr_t physStart, size_t length);
+    void mapArbitraryPage(PageDirectory* pd, uint32_t virt, uint32_t phys, uint32_t flags);
+    void mapArbitraryRange(PageDirectory* pd, uint32_t virt_start, uint32_t phys_start, uint32_t size, uint32_t flags);
     bool is_paging_enabled();
 }

@@ -33,6 +33,29 @@ namespace Paging {
         asm volatile("invlpg (%0)" : : "r"(phys) : "memory");
     }
 
+    void mapArbitraryPage(PageDirectory* pd, uint32_t virt, uint32_t phys, uint32_t flags) {
+        uint32_t pd_index = (virt >> 22) & 0x3FF;
+        uint32_t pt_index = (virt >> 12) & 0x3FF;
+        PageTable* pt;
+        if (!(pd->entries[pd_index] & 1)) {
+            pt = (PageTable*)kalloc4K();
+            kmemset(pt,0,4096);
+            pd->entries[pd_index] = ((uint32_t)pt) | flags;
+        } else {
+            pt = (PageTable*)(pd->entries[pd_index] & 0xFFFFF000);
+        }
+        pt->entries[pt_index] = (phys & 0xFFFFF000) | flags;
+        invalidatePage(virt);
+    }
+
+    void mapArbitraryRange(PageDirectory* pd, uint32_t virt_start, uint32_t phys_start, uint32_t size, uint32_t flags) {
+        uint32_t virt = virt_start;
+        uint32_t phys = phys_start;
+        for (size_t offset = 0;offset < size or offset == 0;offset += 0x1000) {
+            mapArbitraryPage(pd,virt+offset,phys+offset,flags);
+        }
+    }
+
     void mapIdentityPage(PageDirectory* pd, uint32_t phys) {
         uint32_t dirIndex = (phys>>22) & 0x3FF;
         uint32_t tblIndex = (phys>>12) & 0x3FF;

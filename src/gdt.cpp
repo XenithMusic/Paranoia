@@ -59,19 +59,36 @@ extern "C" {
         );
         return;
     }
-    GDTPointer initGDT(GDTEntry* gdt) {
+    GDTPointer initGDT(GDTEntry* gdt, TSS32* tss) {
         cli();
         encodeGDT(gdt, 0,{0,0,0,0,0,0});
         encodeGDT(gdt, 1,{0xFFFF,0,0,0x9A,0xCF,0}); // Kernel Code segment (0x08)
         encodeGDT(gdt, 2,{0xFFFF,0,0,0x92,0xCF,0}); // Kernel Data segment (0x10)
         encodeGDT(gdt, 3,{0xFFFF,0,0,0xFA,0xCF,0}); // User Code segment (0x18)
         encodeGDT(gdt, 4,{0xFFFF,0,0,0xF2,0xCF,0}); // User Data segment (0x20)
-        gdtptr.limit = sizeof(GDTEntry) * 5 - 1;
+        uint32_t tss_addr = (uint32_t)&tss;
+        uint32_t tss_limit = sizeof(tss) - 1;
+        GDTEntry tss_entry = {};
+        tss_entry.limit_low = tss_limit&0xFFFF;
+        tss_entry.base_low = tss_addr&0xFFFF;
+        tss_entry.base_middle = (tss_addr >> 16)&0xFF;
+        tss_entry.access = 0x89;
+        tss_entry.granularity = (tss_limit >> 16)&0x0F;
+        tss_entry.base_high = (tss_addr >> 24)&0xFF;
+        encodeGDT(gdt, 5, tss_entry); // TSS segment (0x28)
+        gdtptr.limit = sizeof(GDTEntry) * 6 - 1;
         gdtptr.base = (uint32_t)gdt;
+
+        // do TSS stuff... >:c
+        tss->ss0 = 0x10; // kernel data seg
+        
         __asm__ __volatile__ ("lgdt (%0)" : : "r"(&gdtptr)); // Load GDT
         __asm__ __volatile__ (
             "ljmp $0x08, $next_label\n" // Far jump to reload CS
             "next_label:\n"
+            "mov $0x28, %%ax\n"
+            "ltr %%ax\n" // ALERT: untested. if there are crashes in either userspace or during GDT init, check here first!
+            ::: "ax", "memory"
         );
         // // Update segment registers after far jump
         // __asm__ __volatile__ (

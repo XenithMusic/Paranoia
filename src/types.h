@@ -32,6 +32,11 @@ typedef uint8_t ubyte1_t;
 
 typedef ubyte1_t ubyte_t;
 
+typedef uint32_t uid_t;
+typedef uid_t fsid_t; // filesystem id
+typedef uid_t fid_t; // file id
+typedef uid_t pid_t; // process id
+
 struct spinlock_t {
     bool locked;
     void* resource;
@@ -58,6 +63,15 @@ typedef struct {
     uint32_t mmap_addr;
 } multiboot_info;
 
+struct Framebuffer {
+    uint32_t framebuffer_addr;     // physical address of framebuffer
+    uint32_t framebuffer_pitch;    // bytes per scanline
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    uint8_t  framebuffer_bpp;      // bits per pixel
+    uint8_t  framebuffer_type;     // 0=Indexed, 1=RGB, 2=EGA Text
+} __attribute__((packed));
+
 // directly from chatgpt for testing to see if this is actually correct
 typedef struct {
     uint32_t flags;        // bitfield
@@ -72,12 +86,7 @@ typedef struct {
     uint32_t mmap_addr;
 
     // --- framebuffer info ---
-    uint32_t framebuffer_addr;     // physical address of framebuffer
-    uint32_t framebuffer_pitch;    // bytes per scanline
-    uint32_t framebuffer_width;
-    uint32_t framebuffer_height;
-    uint8_t  framebuffer_bpp;      // bits per pixel
-    uint8_t  framebuffer_type;     // 0=Indexed, 1=RGB, 2=EGA Text
+    Framebuffer framebuffer;
     uint8_t  reserved[2];          // padding
 } multiboot_info_t;
 
@@ -91,6 +100,87 @@ struct MBlock {
     bool isEnd = true; // if false, there is another block in this sequence.
     enum MBlockState state = RSRV;
 };
+
+struct AllocHeader {
+    size_t STARTBLOCK;
+    size_t ENDBLOCK;
+};
+
+struct TSS32 {
+    uint32_t prev_task_link;
+    uint32_t esp0;
+    uint16_t ss0;
+    uint16_t padding0;
+    uint32_t esp1, esp2;
+    uint16_t ss1, ss2;
+    uint16_t padding1[5];
+    uint32_t cr3, eip, eflags;
+    uint32_t eax, ecx, edx, ebx, esp, ebp, esi, edi;
+    uint16_t es, cs, ss, ds, fs, gs;
+    uint16_t padding2[3];
+    uint16_t io_map_base;
+};
+
+struct Date {
+    uint8_t seconds;
+    uint8_t minutes;
+    uint8_t hours;
+    uint8_t weekday;
+    uint8_t day;
+    uint8_t month;
+    uint8_t year;
+    uint8_t mode;
+};
+
+namespace scheduler {
+    struct Process {
+        bool valid;
+        // state
+        uint32_t EAX;
+        uint32_t EBX;
+        uint32_t ECX;
+        uint32_t EDX;
+        uint32_t ESI;
+        uint32_t EDI;
+        uint32_t EBP;
+        uint32_t ESP;
+        // uint64_t R8;
+        // uint64_t R9;
+        // uint64_t R10;
+        // uint64_t R11;
+        // uint64_t R12;
+        // uint64_t R13;
+        // uint64_t R14;
+        // uint64_t R15;
+
+        uint32_t EIP;
+        uint16_t CS;
+        uint16_t DS;
+        uint16_t SS;
+        uint16_t ES;
+        uint16_t FS;
+        uint16_t GS;
+        uint32_t EFLAGS;
+        uint32_t CR3;
+    };
+};
+
+namespace MBR {
+    struct PTableEntry {
+        ubyte1_t attributes;
+        ubyte1_t ignored1[3];
+        ubyte1_t type;
+        ubyte1_t ignored2[3];
+        ubyte4_t sectorStart;
+        ubyte4_t sectorCount;
+    } __attribute__((packed));
+    struct MBRFooter {
+        ubyte4_t signature;
+        ubyte2_t reserved;
+        PTableEntry partitionTable[4];
+        ubyte2_t magic;
+    } __attribute__((packed));
+}
 
 namespace ext2 {
     enum FilesystemState : ubyte2_t {
@@ -194,9 +284,9 @@ namespace ext2 {
 
     struct BlockGroupDescriptor {
         // Address in blocks.
-        ubyte4_t block_usage_addr;
+        ubyte4_t block_bitmap_addr;
         // Address in blocks.
-        ubyte4_t inode_usage_addr;
+        ubyte4_t inode_bitmap_addr;
         // Address in blocks.
         ubyte4_t inode_table_addr;
         ubyte2_t no_unallocated_blocks;
@@ -304,14 +394,68 @@ namespace ext2 {
         SOCKET,
         LINK_SOFT
     };
-    struct DirectoryEntry {
+    struct DirectoryMetadata {
         ubyte4_t inode;
         ubyte2_t total_size;
         ubyte1_t name_len;
         DirectoryEntryType type;
+    } __attribute__((packed));
+    struct DirectoryEntry {
+        DirectoryMetadata metadata;
         // maximum length is literally just 256 cuz i'm too lazy to make a large name implementation
         char name[];
     } __attribute__((packed));
+    struct FilesystemInfo {
+        Superblock* superblock;
+        BlockGroupDescriptor* bgdt;
+    };
+}
+
+namespace disk {
+    union FSSpecific {
+        void* generic;
+        ext2::FilesystemInfo* ext2;
+    };
+    enum DriveType {
+        ATA
+    };
+    struct Filesystem {
+        char identifier[256];
+        DriveType type;
+        uint16_t index;
+        uint16_t partition;
+        FSSpecific fs;
+        bool writable;
+    };
+}
+
+namespace VFS {
+    enum FilesystemType {
+        ext2
+    };
+    union FSSpecificDetails {
+        ext2::DirectoryMetadata ext2entry;
+    };
+    union FSSpecificFile {
+        void* generic;
+        ext2::Inode* ext2;
+    };
+    struct Filesystem {
+        bool valid = true;
+        disk::Filesystem* fs;
+        FilesystemType type;
+    };
+    struct File {
+        bool valid = false;
+        fsid_t filesystem;
+        fid_t file;
+        FSSpecificDetails details;
+    };
+    struct OpenFile {
+        bool valid = true;
+        File file;
+        FSSpecificFile data;
+    };
 }
 
 enum vga_color {

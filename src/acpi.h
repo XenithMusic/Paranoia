@@ -12,6 +12,10 @@ You should have received a copy of the GNU General Public License along with Par
 
 */
 
+namespace Power {
+	void shutdown();
+}
+
 RSDPLegacyDescriptor* find_rsdp();
 
 Pair<uint8_t,RSDPLegacyDescriptor*> validate_rsdp();

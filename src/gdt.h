@@ -15,6 +15,6 @@ You should have received a copy of the GNU General Public License along with Par
 extern "C" {
     void setGDT(uint16_t limit, void* base);
     void encodeGDT(int index, struct GDTEntry entry);
-    GDTPointer initGDT(GDTEntry* gdt);
+    GDTPointer initGDT(GDTEntry* gdt, TSS32* tss);
     void switchUserspace();
 }

@@ -1,352 +1,421 @@
-#include "ata.h"
-#include "const.h"
-#include "memory.h"
 #include "types.h"
-#include "terminal.h"
-#include "string.h"
-#include "math.h"
+#include "memory.h"
+#include "drivers/genericdisk.h"
 
-// How large sectors returned by the Disk Driver are.
-#define SECTOR_SIZE 512
-
-// Byte offset that the ext2 filesystem starts at.
-#define FS_OFF 64*MEBIBYTES
-
-// Sector offset that the ext2 filesystem starts at.
-#define FS_OFF_SECTORS FS_OFF/SECTOR_SIZE
-
-// The largest size of a block. (in bytes)
-// This is equivalent to the size of the ext2's buffer.
-#define MAX_BLOCK_SIZE 4096
-
-/*
-
-Copyright (C) 2026  XenithMusic (on github)
-
-The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-
-Paranoia is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with Paranoia. If not, see <https://www.gnu.org/licenses/>.
-
-*/
+#define SUPPORTED_REQUIRED_FEATURES 0x00
+#define SUPPORTED_WRITEABLE_FEATURES 0x00
 
 namespace ext2 {
-    char throwawayString[256];
-    Superblock superblock;
-    BlockGroupDescriptor* bgd_table;
-    bool allowWrites;
-    size_t block_size;
-    size_t frag_size;
-    uint8_t buffer[MAX_BLOCK_SIZE]; // best to declare a fixed-size buffer because i'm in the kernel; dynamic alloc is not the best here.
-    enum ExtState {
-        SUCCESS,
-        FAILURE,
-        UNALIGNED,
-        LARGE,
-        BAD_FS,
-        UNCLEAN,
-        NULL_VALUE,
-        NOT_FOUND
-    };
-    /**
-     * This is intended for internal use. If you can pass `userBuffer` to a function instead,
-     * you should.
-     * 
-     * Gets the buffer from the driver, and copies it to a buffer passed by the user.
-     * bufferSize should be equivalent to the blockSize of the read.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     */
-    ExtState get_buffer(size_t bufferSize, void* userBuffer) {
-        if (bufferSize > MAX_BLOCK_SIZE) {
-            return LARGE;
-        }
-        kmemcpy(userBuffer,buffer,bufferSize);
-        return SUCCESS;
-    }
-    ExtState get_superblock(Superblock* userBuffer) {
-        kmemcpy(userBuffer,&superblock,sizeof(Superblock));
-        return SUCCESS;
-    }
-    /**
-     * This overload does not output a buffer, and instead it must be retrieved with ext2::get_buffer.
-     * Pass `userBuffer` to copy the buffer to your own buffer.
-     * 
-     * Reads one block from the disk.
-     * The first block (0) will point to the ext2 file system, not the kernel.
-     * blockSize is passed in bytes.
-     * 
-     * If void* userBuffer is passed, the resulting buffer is `kmemcpy`ied to the passed pointer.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     */
-    ExtState read_block(size_t blockNo,size_t blockSize) {
-        if (blockSize % SECTOR_SIZE != 0) {
-            return UNALIGNED;
-        } else if (blockSize > MAX_BLOCK_SIZE) {
-            return LARGE;
-        }
-        size_t sectorsPerBlock = blockSize/SECTOR_SIZE;
-        size_t startOffset = (blockNo)*sectorsPerBlock+FS_OFF_SECTORS;
-        for (size_t i=0;i < sectorsPerBlock;i++) {
-            disk_ata::read_sector(startOffset+i,disk_ata::ATADrive::MASTER);
-            kmemcpy(buffer+(i*SECTOR_SIZE),disk_ata::get_buffer(),512);
-        }
-        return SUCCESS;
-    }
-    /**
-     * Reads one block from the disk.
-     * The first block (0) will point to the ext2 file system, not the kernel.
-     * blockSize is passed in bytes.
-     * 
-     * The resulting buffer is `kmemcpy`ied to the passed `userBuffer`.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block.)
-     */
-    ExtState read_block(size_t blockNo, size_t blockSize, void* userBuffer) {
-        ExtState result = read_block(blockNo, blockSize);
-        if (result != SUCCESS) return result;
-        return get_buffer(blockSize,userBuffer);
-    }
-    /**
-     * Reads the superblock from the disk.
-     * There is no version of this function that will not write a Superblock buffer to a user-specified pointer.
-     * However, if you don't care, you can pass a nullptr, and it will be ignored.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     * - BAD_FS (resulting superblock does not have a valid ext2 file signature.)
-     */
-    ExtState read_superblock(Superblock* userBuffer) {
-        ExtState response = read_block(1,1024); // NOTE: assume the block size is 1024 to start reading from 1024 bytes. this is correct no matter the block size.
-        if (response != SUCCESS) {
-            return response;
-        }
-        get_buffer(sizeof(Superblock),&superblock);
-        if (superblock.signature != 0xEF53) {
-            return BAD_FS;
-        }
-        if (userBuffer != nullptr) get_superblock(userBuffer);
-        return SUCCESS;
-    }
-    /**
-     * Gets the size of the Block Group Descriptor Table in bytes.
-     */
-    size_t get_bgdt_size(Superblock* superblock) {
-        size_t total = superblock->total_blocks;
-        size_t group = superblock->group_blocks;
-        size_t num_groups = (total+group-1)/group;
-        return sizeof(BlockGroupDescriptor)*num_groups;
-    }
-    /**
-     * Reads the Block Group Descriptor Table from the disk.
-     * There is no version of this function that will not write a buffer to a user-specified pointer.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - NULL_VALUE (not enough information is known; the table must be assumed to be null.)
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block.)
-     */
-    ExtState read_bgd_table(BlockGroupDescriptor* userBuffer,Superblock* superblock) {
-        uint32_t bgdt_block = 2;
-        if (superblock->block_size > 0) {
-            bgdt_block = 1;
-        }
-        size_t bgdt_size = get_bgdt_size(superblock);
-        if (bgdt_size == 0) {
-            return NULL_VALUE;
-        }
-        size_t real_block_size = 1024 << superblock->block_size;
-        for (size_t offset = 0;offset < bgdt_size;offset += real_block_size) {
-            ExtState response = read_block(bgdt_block+(offset/real_block_size),real_block_size);
-            if (response != SUCCESS) return response;
-            kmemcpy((uint8_t*)userBuffer+offset,buffer,min(real_block_size,bgdt_size-offset));
-        }
-        return SUCCESS;
-    }
-    // Inode* get_inode_table(size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table) {
-    //     // FATAL: This is completely non-functional, and yields garbage.
-    //     return (Inode*)table_addr;
-    // }
-    /**
-     * Returns the Inode Table's address for a certain BlockGroupDescriptor.
-     * 
-     * Address is in blocks.
-     * 
-     * Returns:
-     * - ubyte4_t / uint32_t always.
-     */
-    ubyte4_t get_inode_table_address(size_t group,BlockGroupDescriptor* bgd_table) {
-        ubyte4_t table_addr = bgd_table[group].inode_table_addr;
-        return table_addr;
-    }
-    /**
-     * Returns an Inode, and writes it to ubuffer.
-     * 
-     * Warning:
-     * - Make sure the type (inode->types_permissions&0xF000) is not 0.
-     * - This will not fail on an invalid inode.
-     */
-    void get_inode(Inode* ubuffer, size_t address,Superblock* superblock,BlockGroupDescriptor* bgd_table) {
-        size_t index = address-1;
-        size_t per_group = superblock->group_inodes;
-        size_t group = index/per_group;
-        size_t offset = index%per_group;
-
-        ubyte4_t inode_table_base = get_inode_table_address(group,bgd_table)*block_size;
-
-        size_t inode_size = sizeof(Inode); // this assumes that the Inode struct is sized correctly.
-        if (superblock->version_major >= 1) {
-            if (superblock->required_features != 0) {
-                fault(-403,"Unsupported Required Features","ext2 Filesystem");
-            }
-            inode_size = superblock->inode_size;
-        }
-        size_t inode_offset = offset*inode_size;
-        size_t inode_addr = inode_table_base + inode_offset;
-        size_t inode_block = inode_addr/block_size;
-        size_t inode_block_offset = inode_addr%block_size;
-        read_block(inode_block,block_size);
-        kmemcpy(ubuffer,buffer+inode_block_offset,inode_size);
-    }
-    /**
-     * Returns a directory entry notating the child of a directory.
-     * 
-     * Returns:
-     * - Pair<ExtState,DirectoryEntry>
-     * 
-     * ExtState:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     * 
-     */
-    Pair<ExtState,ubyte4_t> get_child(char name[], size_t parentAddress,Superblock* superblock, BlockGroupDescriptor* bgd_table) {
-        // BUG: THIS WILL NOT WORK WITH DIRECTORIES THAT NEED MORE THAN 1 BLOCKS. THIS COULD BREAK WITH AS LOW AS 3 CHILDREN.
-        //
-        //       ...theoretically it could be 1, however names longer than 255 characters are not permitted
-        Inode* parent;
-        get_inode(parent,parentAddress,superblock,bgd_table);
-        for (size_t block = 0; block < 5; block++) {
-            if (parent->direct_pointers[block] == 0) break;
-            Terminal::print("ADDRESS: ");
-                Terminal::print(parseInt(parent->direct_pointers[block],throwawayString,16));
-                Terminal::print("\n");
-            ExtState response = read_block(parent->direct_pointers[block],block_size);
-            if (response != SUCCESS) {
-                return {response,0};
-            }
-            DirectoryEntry* directories = (DirectoryEntry*)buffer;
-            size_t offset = 0;
-            DirectoryEntry* currentDirectory;
-            while (offset < block_size) {
-                currentDirectory = (DirectoryEntry*)((ubyte_t*)directories + offset);
-                if (currentDirectory->inode != 0) {
-                    Terminal::print("inode name_len total_size name: ");
-                        Terminal::print(parseInt(currentDirectory->inode,throwawayString,16));
-                        Terminal::print(" ");
-                        Terminal::print(parseInt(currentDirectory->name_len,throwawayString,16));
-                        Terminal::print(" ");
-                        Terminal::print(parseInt(currentDirectory->total_size,throwawayString,16));
-                        Terminal::print(" ");
-                        Terminal::print((currentDirectory->name));
-                        Terminal::print("\n");
-                    if (currentDirectory->name_len == strlen(name) and
-                        kmemcmp(name,currentDirectory->name,currentDirectory->name_len) == 0) {
-                        return {SUCCESS,currentDirectory->inode};
+    bool consistent = true;
+    void forAllSuperblocks(disk::Filesystem* fs, void* arg, void (*fn)(disk::Filesystem* fs, void* arg, size_t byteOffset)) {
+        size_t sparseLocations[] = {
+            1,
+            3,9,27,81,243,729,2187,6561,19683,59049,177147,
+            5,25,125,625,3125,15625,78125,390625,
+            7,49,343,2401,16807,117649
+        };
+        fn(fs,arg,1024);
+        size_t group_blocks = fs->fs.ext2->superblock->group_blocks;
+        size_t total_blocks = fs->fs.ext2->superblock->total_blocks;
+        size_t block_groups = (total_blocks+group_blocks-1)/group_blocks;
+        size_t block_size = 1024<<fs->fs.ext2->superblock->block_size;
+        for (size_t i=1;i<block_groups;i++) {
+            if (fs->fs.ext2->superblock->writeable_features & 0x0001) {
+                bool present = false;
+                for (size_t loc : sparseLocations) {
+                    if (loc == i) {
+                        present = true;
                     }
                 }
-                if (currentDirectory->total_size == 0) {
-                    break;
-                }
-                offset += currentDirectory->total_size;
+                if (!present) continue;
             }
+            fn(fs,arg,(i*group_blocks + fs->fs.ext2->superblock->superblock_no)*block_size);
         }
-        return {NOT_FOUND,0};
     }
-    /**
-     * Reads a block from an Inode.
-     * 
-     * BUG: This does not work for the 13th block or above, because indirect blocks have not been handled.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     */
-    ExtState read_inode_block(size_t blockIndex, Inode* inode, Superblock* superblock) {
-        if (blockIndex > 12) {
-            fault(2,"LAZY (ext2.read_inode_block)");
+    void writeSuperblock(disk::Filesystem* fs,size_t address) {
+        if (!fs->writable) return;
+        Superblock superblock;
+        disk::get_bytes(fs->index,fs->partition,address,sizeof(Superblock),&superblock);
+        if (superblock.signature != 0xEF53) return;
+        disk::write_bytes(fs->index,fs->partition,address,sizeof(Superblock),(void*)fs->fs.ext2->superblock);
+    }
+    void writeSuperblock(disk::Filesystem* fs,void* unused,size_t address) {
+        writeSuperblock(fs,address);
+    }
+    void writeSuperblocks(disk::Filesystem* fs) {
+        forAllSuperblocks(fs,nullptr,writeSuperblock);
+    }
+    uint32_t getSuperblockChecksum(disk::Filesystem* fs, size_t bytes) {
+        uint32_t checksum = 0;
+        Superblock superblock;
+        disk::get_bytes(fs->index,fs->partition,bytes,sizeof(Superblock),&superblock);
+        if (superblock.signature != 0xEF53) return 0;
+        checksum = superblock.super_blocks + superblock.block_size + superblock.frag_size + superblock.group_blocks;
+        checksum += superblock.signature + superblock.err_handler;
+        checksum += superblock.version_minor + superblock.version_major;
+        return checksum;
+    }
+    void checkSuperblockChecksum(disk::Filesystem* fs, void* arg, size_t bytes) {
+        uint32_t primaryChecksum = *(uint32_t*)arg;
+        uint32_t thisChecksum = getSuperblockChecksum(fs,bytes);
+        if (thisChecksum == 0) return;
+        if (primaryChecksum != thisChecksum) {
+            consistent = false;
+        }
+    }
+    bool checkSuperblockConsistency(disk::Filesystem* fs) {
+        uint32_t targetChecksum = getSuperblockChecksum(fs,1024);
+        consistent = true;
+        forAllSuperblocks(fs,&targetChecksum,checkSuperblockChecksum);
+        if (consistent) {
+            fs->fs.ext2->superblock->mounts_since_fsck = 0;
+            writeSuperblocks(fs);
+        }
+        return consistent;
+    }
+    void setFilesystemState(disk::Filesystem* fs, ext2::FilesystemState state) {
+        fs->fs.ext2->superblock->fs_state = state;
+        writeSuperblocks(fs);
+    }
+    void unmount(disk::Filesystem* fs) {
+        Allocator::free((void*)fs->fs.ext2->superblock);
+        Allocator::free((void*)fs->fs.ext2->bgdt);
+        Allocator::free((void*)fs->fs.generic);
+        Allocator::free((void*)fs);
+    }
+    void read_block(disk::Filesystem* fs,size_t blockIndex,void* buffer) {
+        if (blockIndex == 0) return;
+        size_t blockSize = 1024<<fs->fs.ext2->superblock->block_size;
+        size_t blockStart = blockIndex*blockSize;
+        // Terminal::print("blockStart:");
+        //     Terminal::print(parseU32(blockStart,10));
+        //     Terminal::print("\nblockSize:");
+        //     Terminal::print(parseU32(blockSize,10));
+        //     Terminal::print("\n");
+        disk::get_bytes(fs->index,fs->partition,blockStart,blockSize,buffer);
+    }
+    disk::Filesystem* mount(disk::DriveType driveType, uint16_t driveIndex, uint16_t partitionIndex) {
+        disk::Filesystem* constructed = (disk::Filesystem*)Allocator::kalloc(sizeof(disk::Filesystem));
+        constructed->type = driveType;
+        constructed->index = driveIndex;
+        constructed->partition = partitionIndex;
+        constructed->fs.generic = Allocator::kalloc(sizeof(disk::FSSpecific));
+        constructed->fs.ext2->superblock = (ext2::Superblock*)Allocator::kalloc(sizeof(ext2::Superblock));
+        constructed->writable = true;
+        disk::get_bytes(driveIndex,partitionIndex,1024,sizeof(Superblock),(void*)constructed->fs.ext2->superblock);
+        if (constructed->fs.ext2->superblock->signature != 0xEF53) {
+            if (constructed->fs.ext2->superblock->err_handler == ext2::ErrorHandler::FAULT) {
+                fault(-800,"Ext2 signature is incorrect.");
+            }
+            unmount(constructed);
+            return nullptr;
+        }
+        if (constructed->fs.ext2->superblock->required_features&(~SUPPORTED_REQUIRED_FEATURES) != 0) {
+            return nullptr;
+        }
+        if (constructed->fs.ext2->superblock->writeable_features&(~SUPPORTED_WRITEABLE_FEATURES) != 0) {
+            constructed->writable = false;
         } else {
-            size_t block = inode->direct_pointers[blockIndex];
-            read_block(block,block_size);
-            return SUCCESS;
+            // TODO: update mount date, write date, mount count.
         }
-        return FAILURE;
-    }
-    /**
-     * Finds an inode with a given path on the disk.
-     * 
-     * Returns:
-     * - Pair<ExtState,DirectoryEntry>
-     * 
-     * ExtState:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     * - BAD_PATH (path is formatted incorrectly.)
-     */
-    // Pair<ExtState,DirectoryEntry> find_path()
-    /**
-     * Reads the superblock from the disk.
-     * There is no version of this function that will not write a Superblock buffer to a user-specified pointer.
-     * However, if you don't care, you can pass a nullptr, and it will be ignored.
-     * 
-     * Returns:
-     * - SUCCESS
-     * - UNALIGNED (blockSize is not aligned to the sector size.)
-     * - LARGE (blockSize is larger than the maximum allowed block size.)
-     * - BAD_FS (resulting superblock does not have a valid ext2 file signature.)
-     * - UNCLEAN (file system has errors.)
-     */
-    ExtState init() {
-        ExtState successResponse = SUCCESS;
-        ExtState response = read_superblock(&superblock);
-        if (response != SUCCESS) {
-            return response;
+        if (constructed->fs.ext2->superblock->fs_state == ext2::FilesystemState::ERRORS) {
+            Terminal::print("[WARN] ext2 filesystem contains errors; mounted as read-only.\n");
+            constructed->writable = false;
         }
-        allowWrites = true;
-        if (superblock.fs_state == ERRORS) {
-            successResponse = UNCLEAN;
-            switch (superblock.err_handler) {
-                case FAULT:
-                    while (true) { fault(-800,nullptr,"ext2"); }
-                    break;
-                case READONLY:
-                    allowWrites = false;
-                    break;
-                case SKIP:
-                    break;
-                default:
-                    break;
+        if (constructed->fs.ext2->superblock->mounts_since_fsck >= constructed->fs.ext2->superblock->mounts_to_fsck) {
+            Terminal::print("       Running scheduled consistency check...\n");
+            if (checkSuperblockConsistency(constructed) == false) {
+                Terminal::print("[WARN] ext2 checksum inconsistency; mounted as read-only.\n");
+                constructed->writable = false;
+            } else {
+                Terminal::print("[INFO] ext2 checksum consistent.\n");
             }
         }
-        response = read_bgd_table(bgd_table,&superblock);
-        if (response != SUCCESS) return response;
-        block_size = 1024 << superblock.block_size;
-        frag_size = 1024 << superblock.frag_size;
-        return successResponse;
+        // referencing eduOS driver;
+        // https://github.com/szhou42/osdev/blob/master/src/kernel/filesystem/ext2.c#L877
+        // code was not copied directly; just used for reference.
+        size_t blockSize = 1024<<constructed->fs.ext2->superblock->block_size;
+        size_t groupBlocks = constructed->fs.ext2->superblock->group_blocks;
+        size_t totalBlocks = constructed->fs.ext2->superblock->total_blocks;
+        size_t totalGroups = (totalBlocks+groupBlocks-1)/groupBlocks;
+        
+        size_t bgdBytes = totalGroups*sizeof(BlockGroupDescriptor);
+        size_t bgdBlocks = (bgdBytes+blockSize-1) / blockSize;
+        bgdBytes = bgdBlocks*blockSize;
+
+        size_t bgdBlock = (1024/blockSize)+1; // block after the superblock
+        size_t bgdAddress = bgdBlock*blockSize;
+
+        constructed->fs.ext2->bgdt = (BlockGroupDescriptor*)Allocator::kalloc(bgdBytes);
+        // disk::get_bytes(constructed->index,constructed->partition,bgdAddress,bgdBytes,constructed->fs.ext2->bgdt);
+
+        Terminal::print("debug mount ");
+            Terminal::print(parseInt(blockSize,10));
+            Terminal::print(" ");
+            Terminal::print(parseInt(groupBlocks,10));
+            Terminal::print(" ");
+            Terminal::print(parseInt(totalBlocks,10));
+            Terminal::print(" ");
+            Terminal::print(parseInt(totalGroups,10));
+            Terminal::print(" ");
+            Terminal::print(parseInt(bgdBytes,10));
+            Terminal::print(" ");
+            Terminal::print(parseInt(bgdBlocks,10));
+            Terminal::print(" ");
+            Terminal::print(parseInt(bgdBlock,10));
+            Terminal::print(" ");
+            Terminal::print(parseInt((size_t)(constructed->fs.ext2->bgdt),10));
+            Terminal::print(" ");
+
+        disk::get_bytes(constructed->index,constructed->partition,bgdAddress,bgdBytes,constructed->fs.ext2->bgdt);
+        if (not Allocator::is_allocated(constructed->fs.ext2->bgdt + 62)) {
+            Terminal::print("\nIT'S NOT ALLOCATED FOR SOME GOD DAMN REASON WTF BRO\n");
+        }
+            Terminal::print(parseInt((size_t)(constructed->fs.ext2->bgdt + 62),10));
+            Terminal::print(" ");
+            Terminal::print(parseInt(constructed->fs.ext2->bgdt[62].inode_table_addr,10));
+            Terminal::print("\n");
+
+        // int i=0;
+        // for (size_t block=0;block<=bgdBlocks;block++) {
+        //     ext2::read_block(constructed,block+bgdBlock,constructed->fs.ext2->bgdt+(block*blockSize));
+        //     i += 1;
+        //     if (i >= 6) while(1){};
+        // }
+
+        // size_t bgdtBlock = (1024/blockSize) + 1;
+        // size_t bgdtAddress = bgdtBlock*blockSize;
+        
+        // size_t totalBlocks = constructed->fs.ext2->superblock->total_blocks;
+        // size_t totalInodes = constructed->fs.ext2->superblock->total_inodes;
+        // size_t groupBlocks = constructed->fs.ext2->superblock->group_blocks;
+        // size_t groupInodes = constructed->fs.ext2->superblock->group_inodes;
+        // size_t bgdtCount = (totalBlocks+groupBlocks-1)/groupBlocks;
+        // size_t bgdtCountViaInodes = (totalInodes+groupInodes-1)/groupInodes;
+        // if (bgdtCount != bgdtCountViaInodes) {
+        //     Terminal::print("[WARN] ext2 BGDT count inconsistent; not all files may be accessible.\n");
+        //     // unmount(constructed);
+        //     // return nullptr;
+        // }
+        // size_t bgdtSize = bgdtCount * sizeof(BlockGroupDescriptor);
+        // Terminal::print("calculated using blocks: ");
+        //     Terminal::print(parseInt(bgdtCount,10));
+        //     Terminal::print("\ncalculated using inodes: ");
+        //     Terminal::print(parseInt(bgdtCountViaInodes,10));
+        //     Terminal::print("\n");
+        // constructed->fs.ext2->bgdt = (BlockGroupDescriptor*)Allocator::kalloc(bgdtSize);
+        // disk::get_bytes(
+        //     constructed->index,
+        //     constructed->partition,
+        //     bgdtAddress,
+        //     bgdtSize,
+        //     constructed->fs.ext2->bgdt);
+        // Terminal::print("sizeof(BGDT)=");
+        //     Terminal::print(parseInt(sizeof(BlockGroupDescriptor),10));
+
+        //     Terminal::print("\nfirst inode table=");
+        //     Terminal::print(parseU32(
+        //         constructed->fs.ext2->bgdt[0].inode_table_addr,
+        //     16));
+
+        //     Terminal::print("\n62nd inode table=");
+        //     Terminal::print(parseU32(
+        //         constructed->fs.ext2->bgdt[61].inode_table_addr,
+        //     16));
+
+        //     Terminal::print("\nBGDT location=");
+        //     Terminal::print(parseU32(
+        //         bgdtAddress,
+        //     16));
+
+        //     Terminal::print("\nBGDT size=");
+        //     Terminal::print(parseU32(
+        //         bgdtSize,
+        //     16));
+
+        //     Terminal::print("\nBGDT pointer=");
+        //     Terminal::print(parseU32(
+        //         (size_t)constructed->fs.ext2->bgdt,
+        //     16));
+
+        //     Terminal::print("\n");
+        constructed->fs.ext2->superblock->mounts_since_fsck++;
+        // writeSuperblocks(constructed);
+        return constructed;
+    }
+    Inode* open_inode(disk::Filesystem* fs, size_t address) {
+        address--;
+        size_t blockSize = 1024<<fs->fs.ext2->superblock->block_size;
+        size_t groupInodes = fs->fs.ext2->superblock->group_inodes;
+        size_t groupIndex = address/groupInodes;
+        size_t inode_table_block = fs->fs.ext2->bgdt[groupIndex].inode_table_addr;
+        if (inode_table_block == 0) {
+            Terminal::print("inodeTable is 0\n");
+            Terminal::print("it SHOULD be located at ");
+                Terminal::print(parseInt((size_t)(fs->fs.ext2->bgdt + (groupIndex)),10));
+                Terminal::print("\n");
+            Terminal::print("groupIndex is ");
+                Terminal::print(parseInt(groupIndex,10));
+                Terminal::print("\n");
+            Terminal::print("manually indexing the bgdt by 62 yields ");
+                Terminal::print(parseInt((size_t)(fs->fs.ext2->bgdt + (62)),10));
+                Terminal::print("\n");
+            while(1){}
+        }
+        size_t inodeGroupIndex = address%groupInodes;
+        size_t block_offset = (inodeGroupIndex) * fs->fs.ext2->superblock->inode_size / blockSize;
+        size_t offset_in_block = (inodeGroupIndex) - block_offset * (blockSize/fs->fs.ext2->superblock->inode_size);
+        char* temp = (char*)Allocator::kalloc(blockSize);
+        read_block(fs,inode_table_block + block_offset, temp);
+        Inode* inode = (Inode*)Allocator::kalloc(fs->fs.ext2->superblock->inode_size);
+        kmemcpy(inode,temp + offset_in_block * fs->fs.ext2->superblock->inode_size,fs->fs.ext2->superblock->inode_size);
+        Allocator::free(temp);
+        return inode;
+
+        // Terminal::print("opening inode...\n");
+        // address--;
+        // size_t blockSize = 1024<<fs->fs.ext2->superblock->block_size;
+        // size_t groupInodes = fs->fs.ext2->superblock->group_inodes;
+        // size_t groupIndex = address/groupInodes;
+        // size_t inodeGroupIndex = address%groupInodes;
+        // size_t inodeTableDiskAddrBlocks = fs->fs.ext2->bgdt[groupIndex].inode_table_addr;
+        // if (inodeTableDiskAddrBlocks == 0) {
+        //     Terminal::print("inodeTable is 0\n");
+        //     return nullptr;
+        // }
+        // size_t inodeSizeBytes = 128;
+        // if (fs->fs.ext2->superblock->version_major >= 1) inodeSizeBytes = fs->fs.ext2->superblock->inode_size;
+        // Terminal::print("- inodeSizeBytes is ");
+        //     Terminal::print(parseInt(inodeSizeBytes,10));
+        //     Terminal::print("\n");
+        
+        // size_t inodeTableDiskAddrBytes = inodeTableDiskAddrBlocks*blockSize;
+        // size_t inodeDiskAddrBytes = inodeTableDiskAddrBytes + (inodeGroupIndex*inodeSizeBytes);
+        // Inode* inode = (Inode*)Allocator::kalloc(inodeSizeBytes);
+        // disk::get_bytes(fs->index,fs->partition,inodeDiskAddrBytes,inodeSizeBytes,inode);
+        // if (inode->types_permissions&0xF000 == 0) {
+        //     Terminal::print("inode types == 0???\n");
+        // }
+        // return inode;
+    }
+    void read_inode_block(disk::Filesystem* fs,Inode* inode, size_t block, void* buffer) {
+        size_t blockSize = 1024<<fs->fs.ext2->superblock->block_size;
+        if (block < 12) {
+            Terminal::print("direct\n");
+            read_block(fs,inode->direct_pointers[block],buffer);
+            return;
+        }
+        block -= 12;
+        size_t singlyIndirectCount = blockSize/sizeof(uint32_t);
+        uint32_t* singleIndirectBuffer = (uint32_t*)Allocator::kalloc(singlyIndirectCount*4);
+        if (block < singlyIndirectCount) {
+            read_block(fs,inode->pointer_single_indirect,singleIndirectBuffer);
+            read_block(fs,singleIndirectBuffer[block],buffer);
+            Allocator::free(singleIndirectBuffer);
+            return;
+        }
+        block -= singlyIndirectCount;
+        size_t doublyIndirectCount = singlyIndirectCount*singlyIndirectCount;
+        uint32_t* doubleIndirectBuffer = (uint32_t*)Allocator::kalloc(singlyIndirectCount*4);
+        if (block < doublyIndirectCount) {
+            size_t doubleIndirectIndex = block/singlyIndirectCount;
+            size_t singleIndirectIndex = block%singlyIndirectCount;
+            read_block(fs,inode->pointer_double_indirect,doubleIndirectBuffer);
+            read_block(fs,doubleIndirectBuffer[doubleIndirectIndex],singleIndirectBuffer);
+            read_block(fs,singleIndirectBuffer[singleIndirectIndex],buffer);
+            Allocator::free(doubleIndirectBuffer);
+            Allocator::free(singleIndirectBuffer);
+            return;
+        }
+        block -= doublyIndirectCount;
+        size_t triplyIndirectCount = doublyIndirectCount*singlyIndirectCount;
+        uint32_t* tripleIndirectBuffer = (uint32_t*)Allocator::kalloc(singlyIndirectCount*4);
+        if (block < triplyIndirectCount) {
+            size_t tripleIndirectIndex = block/doublyIndirectCount;
+            size_t doubleIndirectIndex = (block%doublyIndirectCount)/singlyIndirectCount;
+            size_t singleIndirectIndex = block%singlyIndirectCount;
+            read_block(fs,inode->pointer_triple_indirect,tripleIndirectBuffer);
+            read_block(fs,tripleIndirectBuffer[tripleIndirectIndex],doubleIndirectBuffer);
+            read_block(fs,doubleIndirectBuffer[doubleIndirectIndex],singleIndirectBuffer);
+            read_block(fs,singleIndirectBuffer[singleIndirectIndex],buffer);
+        }
+        Allocator::free(tripleIndirectBuffer);
+        Allocator::free(doubleIndirectBuffer);
+        Allocator::free(singleIndirectBuffer);
+        return;
+    }
+    void read_inode(disk::Filesystem* fs,Inode* inode, size_t startAddress, size_t bytes, void* buffer) {
+        size_t blockSize = 1024<<fs->fs.ext2->superblock->block_size;
+        size_t startBlockIndex = startAddress/blockSize;
+        size_t startBlockOffset = startAddress%blockSize;
+        size_t endAddress = startAddress+bytes;
+        size_t endBlockIndex = (endAddress)/blockSize;
+        size_t endBlockOffset = blockSize-(endAddress%blockSize);
+        uint8_t* tempBuffer = (uint8_t*)Allocator::kalloc(blockSize);
+        uint8_t* userBuffer = (uint8_t*)buffer;
+        size_t accumulated = 0;
+        for (size_t block=startBlockIndex;block <= endBlockIndex;block++) {
+            Terminal::print("(read_inode) block: ");
+                Terminal::print(parseU32(block,10));
+                Terminal::print("\n");
+            read_inode_block(fs,inode,block,tempBuffer);
+            size_t srcOffset = 0;
+            size_t endOffset = 0;
+            if (block == startBlockIndex) srcOffset = startBlockOffset;
+            if (block == endBlockIndex) endOffset = endBlockOffset;
+            kmemcpy(userBuffer+accumulated,tempBuffer+srcOffset,blockSize-srcOffset-endOffset);
+            accumulated += blockSize-srcOffset-endOffset;
+        }
+        Allocator::free(tempBuffer);
+    }
+    Pair<bool,DirectoryMetadata> get_child(disk::Filesystem* fs, Inode* inode, char* child_name) {
+        size_t blockSize = 1024<<fs->fs.ext2->superblock->block_size;
+        uint8_t* buffer = (uint8_t*)Allocator::kalloc(blockSize);
+        uint64_t maximumBlock = (inode->lower_size+blockSize-1)/blockSize;
+        DirectoryEntry* child = nullptr;
+        size_t nameLen = strlen(child_name);
+        if (fs->fs.ext2->superblock->version_major >= 1) {
+            maximumBlock |= inode->upper_size<<32;
+        }
+        DirectoryEntry* entry = nullptr;
+        for (size_t block = 0;block <= maximumBlock && child == nullptr;block++) {
+            read_inode_block(fs, inode, block, buffer);
+            size_t position = 0;
+            while (position < blockSize) {
+                entry = (DirectoryEntry*)(buffer+position);
+                if ( // validity check
+                    entry->metadata.name_len == nameLen and 
+                    entry->metadata.inode != 0) 
+                    {
+                    int comparison = kmemcmp(entry->name,child_name,entry->metadata.name_len);
+                    Terminal::print("... ");
+                        Terminal::print(entry->name);
+                        Terminal::print(" at length ");
+                        Terminal::print(parseInt(entry->metadata.name_len,10));
+                        Terminal::print(" compared to ");
+                        Terminal::print(parseInt(comparison,10));
+                        Terminal::print("\n");
+                    if (comparison == 0) {
+                        child = entry;
+                        goto child_found;
+                    }
+                }
+                position += entry->metadata.total_size;
+                while (position < blockSize && buffer[position] == 0) {
+                    position++; // NOTE: could be 4x faster; this does not skip unaligned positions
+                }
+            }
+        }
+        child_found:
+        Pair<bool,DirectoryMetadata> returnValue = {false,NULL};
+        if (child != nullptr) {
+            returnValue.first = true;
+            returnValue.second = *((DirectoryMetadata*)child);
+        }
+        Allocator::free(buffer);
+        return returnValue;
+    }
+    void close_inode(Inode* inode) {
+        Allocator::free(inode);
     }
 }

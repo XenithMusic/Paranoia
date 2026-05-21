@@ -4,6 +4,7 @@
 #include "string.h"
 #include "const.h"
 #include "fail.h"
+#include "math.h"
 
 /*
 
@@ -22,7 +23,7 @@ You should have received a copy of the GNU General Public License along with Par
 #define BLOCK_SIZE 512 // 512B
 #define NUM_BLOCKS MEMORY_POOL_SIZE/BLOCK_SIZE // 512 MiB
 
-#define MEM_START (0x1*MEBIBYTES)
+#define MEM_START (0x9*MEBIBYTES)
 
 #if (NUM_BLOCKS%1) != 0
 #error "(-2032) NUM_BLOCKS should be an integer."
@@ -37,16 +38,20 @@ namespace Allocator {
     static char* memory_pool = (char*)MEM_START;
 	static MBlock bitmap[NUM_BLOCKS];
 
+    char* str; // pointer if anything demands a pointer
+
     void init() {
         if ((NUM_BLOCKS%1) != 0) {
+            setError(-2032);
             fault(-101);
         }
         if ((CONST_KERNELSIZE) >= NUM_BLOCKS) {
+            setError(-2033);
             fault(-101);
         }
-        for (size_t i = 0;i < NUM_BLOCKS;i++) {
+    	for (int i = 0; i < NUM_BLOCKS; i++) {
+    		bitmap[i].state = FREE;
             bitmap[i].isEnd = true;
-            bitmap[i].state = FREE;
             if (i < CONST_KERNELSIZE) {
                 bitmap[i].state = RSRV;
                 // bitmap[i].isEnd = true; -- This is redundant.
@@ -54,25 +59,32 @@ namespace Allocator {
                     bitmap[i-1].isEnd = false;
                 }
             }
-        }
+    	}
     }
-    bool is_allocated(void* ptr) {
-        size_t startBlock = (((size_t)ptr)-MEM_START)/BLOCK_SIZE;
-        MBlock* block = &bitmap[startBlock];
-        return block->state != MBlockState::FREE;
+
+    size_t getBlocks() {
+        return NUM_BLOCKS;
     }
+
+    size_t getBlockSize() {
+        return BLOCK_SIZE;
+    }
+
     void *kalloc(size_t size) {
+        size = 1;
         size_t contiguous = 0;
-        size_t needed = (size+BLOCK_SIZE-1)/BLOCK_SIZE; // FATAL: INCOMPLETE IMPL -- HOW SO WHAT AM I MISSING -- FOUND IT LOL
+        size_t needed = (size+BLOCK_SIZE-1)/BLOCK_SIZE;
         size_t start = SIZE_MAX;
-        Terminal::printdebug("(kalloc) I need ");
-            Terminal::printdebug(parseInt(needed,10));
-            Terminal::printdebug(" blocks!\n");
         if (needed == 0) {
             return nullptr;
         }
         for (size_t i = 0;i < NUM_BLOCKS;i++) {
-            if (bitmap[i].state != FREE) {
+            if (bitmap[i].state == RSRV) {
+                start = SIZE_MAX;
+                contiguous = 0;
+                continue;
+            }
+            if (bitmap[i].state == USED) {
                 start = SIZE_MAX;
                 contiguous = 0;
                 continue;
@@ -85,8 +97,7 @@ namespace Allocator {
                     bitmap[j].isEnd = false;
                 }
                 bitmap[i].isEnd = true;
-                void* ptr = (void*)(MEM_START+start*BLOCK_SIZE);
-                return (void*)ptr;
+                return (void*)(MEM_START+start*BLOCK_SIZE);
             }
         }
         fault(-102);
@@ -94,15 +105,36 @@ namespace Allocator {
     }
 
     void free(void* pointer) {
-        size_t startBlock = (((size_t)pointer)-MEM_START)/BLOCK_SIZE;
-        MBlock* block = &bitmap[startBlock];
-        if (block->state != MBlockState::USED) return;
-        bool isEnd = false;
-        while (!block->isEnd) {
-            if (block->state != MBlockState::USED) fault(-100,"Found unused block inside allocation while freeing.");
-            block->state = MBlockState::FREE;
-            block += 1;
+        size_t index = ((char*)pointer - memory_pool) / BLOCK_SIZE;
+        if (index < CONST_KERNELSIZE) {
+            setError(-2030);
+            return;
         }
+        if (bitmap[index].state == RSRV) {
+            setError(-2030);
+            return;
+        }
+        if (bitmap[index].state == FREE) {
+            setError(-2031);
+            return;
+        }
+        if (index >= NUM_BLOCKS) {
+            setError(-2029);
+            return;
+        }
+
+        // Free the segmented block.
+
+        for (size_t j = index; j < NUM_BLOCKS; j++) {
+            if (bitmap[j].state == FREE) break;
+            bitmap[j].state = FREE;
+            if (bitmap[j].isEnd) {
+                return;
+            }
+        }
+        setError(-100);
+        fault(-100);
+        return;
     }
 }
 
@@ -133,13 +165,7 @@ void* kmemcpy(void* dest, const void* src, size_t n) {
     return dest;
 }
 
-// kmemcpy but it's safe for overlapping regions
-void* kmemmove(void* dest, const void* src, size_t n) {
-    uint8_t* swap = (uint8_t*)Allocator::kalloc(n); 
-    kmemcpy(swap,src,n);
-    uint8_t* d = (uint8_t*)dest;
-    for (size_t i = 0; i < n; i++) {
-        d[i] = swap[i];
-    }
-    return dest;
-}
+// void* phys_to_virt(uintptr_t phys) {
+//     // Assume you have a direct 1:1 mapping for low memory or a known mapping region
+//     return (void*)(phys + KERNEL_VIRTUAL_BASE); 
+// }

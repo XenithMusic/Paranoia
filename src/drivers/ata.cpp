@@ -55,7 +55,7 @@ namespace disk_ata {
         TIMEOUT
     };
 
-    enum ATADrive {
+    enum ATADrive : uint16_t {
         MASTER = 0xA0,
         SLAVE = 0xB0
     };

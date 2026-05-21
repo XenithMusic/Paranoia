@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "string.h"
 #include "page.h"
+#include "utils.h"
 
 /*
 
@@ -24,6 +25,15 @@ You should have received a copy of the GNU General Public License along with Par
 #define ALIGNMENT 16
 
 char* stratus; // pointer if anything demands a pointer
+
+namespace Power {
+	void shutdown() {
+		outw(0x604, 0x2000); // QEMU
+		outw(0xB004, 0x2000); // Bochs and old QEMU
+		outw(0x4004, 0x3400); // Virtualbox
+		outw(0x600, 0x34); // Cloud Hypervisor
+	}
+}
 
 bool verify_rsdp_checksum(RSDPLegacyDescriptor* rsdp) {
     uint8_t sum = 0;

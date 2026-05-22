@@ -194,4 +194,37 @@ namespace VFS {
             ext2::read_inode(fsentry->fs,file->data.ext2,startAddress,bytes,buffer);
         }
     }
+    uint64_t getFileSize(fid_t fid) {
+        OpenFile* file = openedfiles[fid];
+        Filesystem* fsentry = (filesystems)[file->file.filesystem];
+        uint64_t size = 0;
+        if (fsentry->type == ext2) {
+            size = file->data.ext2->lower_size;
+        }
+        return size;
+    }
+    uint64_t getDiskAllocationSize(fid_t fid) {
+        OpenFile* file = openedfiles[fid];
+        Filesystem* fsentry = (filesystems)[file->file.filesystem];
+        uint64_t size = getFileSize(fid);
+        uint64_t realsize = size;
+        if (fsentry->type == ext2) {
+            size_t blockSize = 1024<<fsentry->fs->fs.ext2->superblock->block_size;
+            realsize += ((size+blockSize-1)/blockSize)/8;
+            // the above is BGDT block bitmap contribution. this may seem a little odd, since this is a 
+            // filesystem-wide concept, however this is always true, as this will add no blocks for 0-byte files, matching
+            // function behavior, and add one block (one bit) for 1-byte files, which would match the growth of the 
+            // inode bitmap table; the inode bitmap table is incredibly unlikely to force an expansion of the BGDT,
+            // thus this addition holds true.
+            //
+            // if this is not odd, my bad, i told an AI how i was doing this (i wrote the code) and it more or
+            // less asked me "why the fuck" and said this was bullshit.
+
+            realsize += fsentry->fs->fs.ext2->superblock->inode_size; // size of the inode entry.
+        }
+        if (realsize < size) {
+            realsize = size; // WOW, THAT'S A BIG ASS FILE. 9 EXABYTES?? ARE YOU ON LIKE ZFS OR SOME SHIT???
+        }
+        return realsize;
+    }
 }

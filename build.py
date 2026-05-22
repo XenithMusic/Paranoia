@@ -32,7 +32,7 @@ with open("Makefile","r") as f:
 	data = f.read().split("\n")
 
 constants = {
-	"CONST_VERSION":"\"indev-2025-01-24\"",
+	"CONST_VERSION":"\"early-0.1.0\"",
     "CONST_DEBUGGING":"false",
     "BITS32":"true",
 }

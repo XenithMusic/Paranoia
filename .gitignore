@@ -1,4 +1,12 @@
 *.bin
 *.iso
+*.img
+*.raw
 *.log
 *.o
+*.code-workspace
+.vscode/
+.bochsrc
+bochsout.txt
+fsconst/
+bin/

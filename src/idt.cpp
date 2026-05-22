@@ -3,17 +3,11 @@
 #include "types.h"
 #include "utils.h"
 #include "isr.h"
-
-#define PIC1		0x20		/* IO base address for master PIC */
-#define PIC2		0xA0		/* IO base address for slave PIC */
-#define PIC1_COMMAND	PIC1
-#define PIC1_DATA	(PIC1+1)
-#define PIC2_COMMAND	PIC2
-#define PIC2_DATA	(PIC2+1)
+#include "pic.h"
 
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -33,17 +27,13 @@ uint8_t IDT_MAX_DESCRIPTORS = 0;
 
 extern "C" {
 	void remapPIC() {
-		outb(PIC1_COMMAND, 0x11); // starts the initialization sequence
-		outb(PIC2_COMMAND, 0x11);
-		outb(PIC1_DATA, 0x20); // remap offset of master PIC to 0x20 (32)
-		outb(PIC2_DATA, 0x28); // remap offset of slave PIC to 0x28 (40)
-		outb(PIC1_DATA, 0x04); // tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
-		outb(PIC2_DATA, 0x02); // tell Slave PIC its cascade identity (0000 0010)
-		outb(PIC1_DATA, 0x01); // set 8086/88 (MCS-80/85) mode
-		outb(PIC2_DATA, 0x01);
 		// optionally, clear data registers (mask all IRQs for now)
-		outb(PIC1_DATA, 0x0);
-		outb(PIC2_DATA, 0x0);
+		// doing this manually lol
+		uint8_t PIC1_IRQ_MASK = 0xFF;
+		PIC1_IRQ_MASK &= ~(1 << 0); // unmask IRQ0
+		PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
+		uint8_t PIC2_IRQ_MASK = 0xFF;
+		pic::remapPIC(PIC1_IRQ_MASK,PIC2_IRQ_MASK);
 	}
 	void catchAll() { // generic thing to see if any interrupts occur (do not replace)
 		while (1) __asm__ __volatile__ ("hlt");
@@ -70,7 +60,23 @@ extern "C" {
 			encodeIDT(idt,vec,(void*)&exception_handler,0x8e);
 		}
 		encodeIDT(idt,0x00,(void*)&divzero_handler,0x8e);
-		encodeIDT(idt,0x21,(void*)&exception_handler,0x8e);
+		encodeIDT(idt,0x0d,(void*)&genprotfault_handler,0x8e);
+		encodeIDT(idt,0x20,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x21,(void*)&irq1_assembly,0x8e);
+		encodeIDT(idt,0x22,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x23,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x24,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x25,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x26,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x27,(void*)&basic_eoi_assembly_low,0x8e);
+		encodeIDT(idt,0x28,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x29,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2a,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2b,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2c,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2d,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2e,(void*)&basic_eoi_assembly_high,0x8e);
+		encodeIDT(idt,0x2f,(void*)&basic_eoi_assembly_high,0x8e);
 		lidt(idt);
 		sti();
 	}

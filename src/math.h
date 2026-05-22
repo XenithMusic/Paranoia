@@ -2,7 +2,7 @@
 
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License along with Par
 extern "C" {
     int floor(double x);
     int ceil(double x);
+    int min(int a, int b);
+    int max(int a, int b);
     double pow(double x, int i);
     double ln(double x);
     double log_b(double x, double b);

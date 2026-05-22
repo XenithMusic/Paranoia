@@ -7,7 +7,7 @@
 
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -36,7 +36,14 @@ namespace Allocator {
 
     void init();
 
-    void *malloc(size_t size);
+    bool is_allocated(void* ptr);
+    void *kalloc(size_t size);
 
     void free(void* pointer);
+
 }
+void kmemset(void* start, char value, size_t length);
+int kmemcmp(const void* s1, const void* s2, size_t n);
+void* kmemcpy(void* dest, const void* src, size_t n);
+void* kmemmove(void* dest, const void* src, size_t n);
+void* phys_to_virt(uintptr_t phys);

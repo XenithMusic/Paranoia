@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -24,6 +24,10 @@ You should have received a copy of the GNU General Public License along with Par
 
 #ifndef CONST_KERNELSIZE
 #define CONST_KERNELSIZE 0
+#endif
+
+#ifndef CONST_DEBUGGING
+#define CONST_DEBUGGING false
 #endif
 
 #define KIBIBYTES 1024

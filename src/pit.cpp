@@ -3,7 +3,7 @@
 
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -21,16 +21,22 @@ extern "C" {
 	void set_pit_count(int count) {
 		overflowCount = 0;
 		previous_count = count%65536;
+		bool interruptsEnabled = checkInterrupts();
 		// Disable interrupts
 		cli();
 		
 		// Set low byte
 		outb(0x40,count&0xFF);		// Low byte
 		outb(0x40,(count&0xFF00)>>8);	// High byte
+
+		if (interruptsEnabled)
+			sti();
 		return;
 	}
 	uint64_t get_pit_count(void) {
 		unsigned count = 0;
+		
+		bool interruptsEnabled = checkInterrupts();
 		
 		// Disable interrupts
 		cli();
@@ -47,6 +53,9 @@ extern "C" {
 			overflowCount++;
 		}
 		previous_count = count;
+
+		if (interruptsEnabled)
+			sti();
 		
 		return count+(overflowCount*65536);
 	}
@@ -57,7 +66,8 @@ extern "C" {
 		return seconds;
 	}
 
-	void sleep(double seconds) {
+	void busy_sleep(double seconds) {
+		// Please do not use. I will implement a non-busy sleep eventually.
 		double now = get_pit_seconds();
 		while (get_pit_seconds() < now+seconds) {};
 		return;

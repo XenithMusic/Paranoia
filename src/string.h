@@ -2,7 +2,7 @@
 
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -13,11 +13,11 @@ You should have received a copy of the GNU General Public License along with Par
 */
 
 
-extern "C" {
-    size_t strlen(const char* str);
-    bool stringSafe(const char* str);
-    char* stringConcat(const char* a, const char* b);
-    char* parseInt(int inNum, char* str, int base);
-    char* parseU32(uint32_t inNum, char* str, int base);
-    char* parseDouble(double inNum, char* str, int precision);
-}
+size_t strlen(const char* str);
+bool stringSafe(const char* str);
+char* stringConcat(const char* a, const char* b);
+char* parseInt(int inNum, char* str, int base);
+char* parseInt(int inNum, int base);
+char* parseU32(uint32_t inNum, char* str, int base);
+char* parseU32(uint32_t inNum, int base);
+char* parseDouble(double inNum, char* str, int precision);

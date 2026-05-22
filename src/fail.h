@@ -2,7 +2,7 @@
 
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -17,6 +17,7 @@ void setError(int errno);
 void assert(bool dontcrash);
 int getError();
 void clearError();
+void fault(int errno,char* string,char* source);
 void fault(int errno,char* string);
 void fault(int errno);
 

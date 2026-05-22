@@ -5,9 +5,16 @@
 - [x] Does not trust user-space programs in the slightest.
 - [x] Memory Allocation (probably p bad, but it's good enough)
 - [x] Keeping track of time poorly
-- [X] Interrupt Descriptor Table
+- [x] Interrupt Descriptor Table
+- [x] Paging
 - [ ] Drivers
-- [ ] Ext2 file system
+  - [x] PS/2 Controller
+  - [x] PS/2 Keyboard
+    - BUG: Scancode sets are somewhat broken. I will fix them eventually. Probably.
+  - [X] Ext2 Filesystem
+  - [ ] Virtual Filesystem
+    - [X] Reading
+    - [ ] Writing
 - [ ] System Call API
 - [ ] Executing other programs
 - [ ] Scheduler and/or threading
@@ -26,4 +33,5 @@ This will automatically build, and run with `qemu-system-i386`.
 If you do not have `qemu-system-i386` installed, use whatever emulator you want to boot from the .iso file that can be found in the root directory.
 
 Tested on:
-- Linux Mint 21.3 (qemu-system-i386)
+- Linux Mint 21.3 (qemu-system-i386, i686-elf-tools)
+- Arch Linux (qemu-system-i386, i386-elf-tools)

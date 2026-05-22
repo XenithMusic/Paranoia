@@ -12,9 +12,16 @@ https://wiki.osdev.org/OSDev_Wiki:General_disclaimer
 /* Declare constants for the multiboot header. */
 .set ALIGN,    1<<0             /* align loaded modules on page boundaries */
 .set MEMINFO,  1<<1             /* provide memory map */
+.set VIDEO,    1<<2             /* request framebuffer */
+
 .set FLAGS,    ALIGN | MEMINFO  /* this is the Multiboot 'flag' field */
 .set MAGIC,    0x1BADB002       /* 'magic number' lets bootloader find the header */
 .set CHECKSUM, -(MAGIC + FLAGS) /* checksum of above, to prove we are multiboot */
+
+.set FB_WIDTH, 1024
+.set FB_HEIGHT,768
+.set FB_BIT, 32
+.set MODE_TYPE, 0 /* mode_type = framebuffer */
 
 /* 
 Declare a multiboot header that marks the program as a kernel. These are magic
@@ -28,6 +35,18 @@ forced to be within the first 8 KiB of the kernel file.
 .long MAGIC
 .long FLAGS
 .long CHECKSUM
+
+/* ignore these; AOUT_KLUDGE is not set */
+.long 0 /* header_addr */
+.long 0 /* load_addr */
+.long 0 /* load_end_addr */
+.long 0 /* bss_end_addr */
+.long 0 /* entry_addr */
+
+.long MODE_TYPE
+.long FB_WIDTH
+.long FB_HEIGHT
+.long FB_BIT
 
 /*
 The multiboot standard does not define the value of the stack pointer register

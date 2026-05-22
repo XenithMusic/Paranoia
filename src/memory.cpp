@@ -4,11 +4,10 @@
 #include "string.h"
 #include "const.h"
 #include "fail.h"
-#include "math.h"
 
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -23,7 +22,7 @@ You should have received a copy of the GNU General Public License along with Par
 #define BLOCK_SIZE 512 // 512B
 #define NUM_BLOCKS MEMORY_POOL_SIZE/BLOCK_SIZE // 512 MiB
 
-#define MEM_START (0x2*MEBIBYTES)
+#define MEM_START (0x1*MEBIBYTES)
 
 #if (NUM_BLOCKS%1) != 0
 #error "(-2032) NUM_BLOCKS should be an integer."
@@ -40,16 +39,14 @@ namespace Allocator {
 
     void init() {
         if ((NUM_BLOCKS%1) != 0) {
-            setError(-2032);
             fault(-101);
         }
         if ((CONST_KERNELSIZE) >= NUM_BLOCKS) {
-            setError(-2033);
             fault(-101);
         }
-    	for (int i = 0; i < NUM_BLOCKS; i++) {
-    		bitmap[i].state = FREE;
+        for (size_t i = 0;i < NUM_BLOCKS;i++) {
             bitmap[i].isEnd = true;
+            bitmap[i].state = FREE;
             if (i < CONST_KERNELSIZE) {
                 bitmap[i].state = RSRV;
                 // bitmap[i].isEnd = true; -- This is redundant.
@@ -57,82 +54,92 @@ namespace Allocator {
                     bitmap[i-1].isEnd = false;
                 }
             }
-    	}
-    }
-
-    size_t getBlocks() {
-        return NUM_BLOCKS;
-    }
-
-    size_t getBlockSize() {
-        return BLOCK_SIZE;
-    }
-
-    void *malloc(size_t size) {
-        size_t blocksToAllocate = 1;
-    	if (size > BLOCK_SIZE) {
-            setError(-2028);
-            blocksToAllocate = (size_t)ceil(size/BLOCK_SIZE);
-            // will allow such an allocation, despite error -2028.
-            // the error here acts more as a warning.
         }
-
-        size_t contiguousBlocks = 0;
-        size_t start_block = 0;
-
-        for (int i = 0; i < NUM_BLOCKS; i++) {
-            if (bitmap[i].state == FREE) {
-                if (contiguousBlocks == 0) {
-                    start_block = i;
-                }
-                contiguousBlocks++;
-            } else {
-                contiguousBlocks = 0;
-                start_block = 0;
+    }
+    bool is_allocated(void* ptr) {
+        size_t startBlock = (((size_t)ptr)-MEM_START)/BLOCK_SIZE;
+        MBlock* block = &bitmap[startBlock];
+        return block->state != MBlockState::FREE;
+    }
+    void *kalloc(size_t size) {
+        size_t contiguous = 0;
+        size_t needed = (size+BLOCK_SIZE-1)/BLOCK_SIZE; // FATAL: INCOMPLETE IMPL -- HOW SO WHAT AM I MISSING -- FOUND IT LOL
+        size_t start = SIZE_MAX;
+        Terminal::printdebug("(kalloc) I need ");
+            Terminal::printdebug(parseInt(needed,10));
+            Terminal::printdebug(" blocks!\n");
+        if (needed == 0) {
+            return nullptr;
+        }
+        for (size_t i = 0;i < NUM_BLOCKS;i++) {
+            if (bitmap[i].state != FREE) {
+                start = SIZE_MAX;
+                contiguous = 0;
+                continue;
             }
-            if (contiguousBlocks >= blocksToAllocate) {
-                for (size_t j = start_block; j < start_block + blocksToAllocate; j++) {
+            if (start == SIZE_MAX) start = i;
+            contiguous++;
+            if (contiguous >= needed) {
+                for (size_t j = start;j <= i;j++) {
                     bitmap[j].state = USED;
-                    bitmap[j].isEnd = (j == start_block + blocksToAllocate - 1);
+                    bitmap[j].isEnd = false;
                 }
-                return (void*)(memory_pool + start_block * BLOCK_SIZE);
+                bitmap[i].isEnd = true;
+                void* ptr = (void*)(MEM_START+start*BLOCK_SIZE);
+                return (void*)ptr;
             }
         }
-
-        setError(-2026);
-
+        fault(-102);
         return nullptr;
     }
 
     void free(void* pointer) {
-        size_t index = ((char*)pointer - memory_pool) / BLOCK_SIZE;
-        if (index < CONST_KERNELSIZE) {
-            setError(-2030);
-            return;
+        size_t startBlock = (((size_t)pointer)-MEM_START)/BLOCK_SIZE;
+        MBlock* block = &bitmap[startBlock];
+        if (block->state != MBlockState::USED) return;
+        bool isEnd = false;
+        while (!block->isEnd) {
+            if (block->state != MBlockState::USED) fault(-100,"Found unused block inside allocation while freeing.");
+            block->state = MBlockState::FREE;
+            block += 1;
         }
-        if (bitmap[index].state == RSRV) {
-            setError(-2030);
-            return;
-        }
-        if (bitmap[index].state == FREE) {
-            setError(-2031);
-            return;
-        }
-        if (index >= NUM_BLOCKS) {
-            setError(-2029);
-            return;
-        }
-
-        // Free the segmented block.
-
-        for (size_t j = index; j < NUM_BLOCKS; j++) {
-            bitmap[j].state = FREE;
-            if (bitmap[j].isEnd) {
-                return;
-            }
-        }
-        setError(-100);
-        fault(-100);
-        return;
     }
+}
+
+void kmemset(void* start, char value, size_t length) {
+    char* startChar = (char*)start;
+    for (size_t i = 0; i < length; i++) {
+        startChar[i] = value;
+    }
+}
+
+int kmemcmp(const void* s1, const void* s2, size_t n) {
+    const uint8_t* p1 = (const uint8_t*)s1;
+    const uint8_t* p2 = (const uint8_t*)s2;
+
+    for (size_t i = 0; i < n; i++) {
+        if (p1[i] < p2[i]) return -1;
+        if (p1[i] > p2[i]) return 1;
+    }
+    return 0;
+}
+
+void* kmemcpy(void* dest, const void* src, size_t n) {
+    uint8_t* d = (uint8_t*)dest;
+    const uint8_t* s = (const uint8_t*)src;
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+    return dest;
+}
+
+// kmemcpy but it's safe for overlapping regions
+void* kmemmove(void* dest, const void* src, size_t n) {
+    uint8_t* swap = (uint8_t*)Allocator::kalloc(n); 
+    kmemcpy(swap,src,n);
+    uint8_t* d = (uint8_t*)dest;
+    for (size_t i = 0; i < n; i++) {
+        d[i] = swap[i];
+    }
+    return dest;
 }

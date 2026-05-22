@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# guarantee all of my loopbacks are unmounted (these will likely fail)
+sudo umount ./fsconst/primary
+sudo losetup -D
+
+# create disk
+echo "[build_filesystem_v2] Creating image."
+dd if=/dev/zero of=filesystem.img bs=1M count=256 conv=sparse
+parted filesystem.img mklabel msdos # mbr table
+# parted filesystem.img mklabel gpt # gpt table
+parted filesystem.img mkpart primary ext2 1MiB 100%
+
+mkdir -p ./fsconst/primary
+
+sudo losetup -Pf filesystem.img
+
+# format
+echo "[build_filesystem_v2] Formatting image."
+sudo mkfs.ext2 -I 128 -O ^has_journal,^ext_attr,^resize_inode,^dir_index,^filetype,^sparse_super /dev/loop0p1
+sudo tune2fs -e panic /dev/loop0p1 # set errorhandling method to panic (0x3)
+sudo tune2fs -L "primary" /dev/loop0p1
+sudo tune2fs -c 5 /dev/loop0p1
+sudo tune2fs -C -1 /dev/loop0p1
+
+# build filesystem
+echo "[build_filesystem_v2] Building filesystem."
+sudo mount /dev/loop0p1 ./fsconst/primary
+sudo cp -r ./iso/* ./fsconst/primary
+sudo cp -r ./filesystem/* ./fsconst/primary
+
+# install grub
+echo "[build_filesystem_v2] Installing grub."
+sudo grub-install --target=i386-pc --boot-directory=./fsconst/primary/boot /dev/loop0
+
+# unmount
+echo "[build_filesystem_v2] Done! Cleaning."
+sync
+sudo umount ./fsconst/primary
+sudo losetup -D
+
+echo "[build_filesystem_v2] Cleaned up!"
+
+# create
+
+
+# # mount filesystem
+# echo "[build_filesystem] Mounting filesystem."
+
+# mkdir -p /mnt/paranoia_fs
+# mount -o loop filesystem.img /mnt/paranoia_fs
+
+# # fill
+
+# echo "[build_filesystem] Filling filesystem."
+# cp -ar filesystem/* /mnt/paranoia_fs
+
+# # unmount
+
+# echo "[build_filesystem] Unmounting filesystem."
+# sync
+# umount /mnt/paranoia_fs

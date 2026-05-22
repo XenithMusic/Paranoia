@@ -3,9 +3,11 @@
 #include "pit.h"
 #include "utils.h"
 
+#define COM1 0x3F8
+
 /*
 
-Copyright (C) 2024  XenithMusic (on github)
+Copyright (C) 2026  XenithMusic (on github)
 
 The Paranoia kernel is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -36,7 +38,7 @@ void stackTrace(unsigned int MaxFrames)
 
 void setError(int errno) {
 	if (errno == 1000) {
-		induceHang();
+		induceHalt();
 	} else {
 		error = errno;
 	}
@@ -58,7 +60,8 @@ void clearError() {
 	error = 0;
 }
 
-void fault(int errno,char* string) {
+void fault(int errno,char* string,char* source) {
+	outstr(COM1,"FAULT");
 	cli(); // prevent interrupts causing unexpected fault exiting
 	char* str;
 	Terminal::init();
@@ -71,11 +74,16 @@ void fault(int errno,char* string) {
 		Terminal::print(parseInt(errno,str,10));
 		Terminal::print("\n");
 	if (string != nullptr) {
-	Terminal::print("  Extra: ");
-		Terminal::print(string);
+		Terminal::print("  Extra: ");
+			Terminal::print(string);
+			Terminal::print("\n");
+	}
+	if (source != nullptr) {
+	Terminal::print("  Source: ");
+		Terminal::print(source);
 		Terminal::print("\n");
 	}
-	Terminal::print("  Stack Trace: ");
+	Terminal::print("  Stack Trace:\n\n");
 	stackTrace(20);
 	Terminal::print("\n");
 	Terminal::print("Your computer will not restart itself.\n\n");
@@ -86,47 +94,155 @@ void fault(int errno,char* string) {
 
 		Terminal::print("  If this occurs in a production release, please\n");
 		Terminal::print("  inform the developer at <xenith.contact.mail@gmail\n");
-		Terminal::print("  .com>, and then downgrade.");
+		Terminal::print("  .com>, and then downgrade.\n");
 	}
 	if (errno == 10000) {
 		Terminal::print("  An unspecified error occurred, causing Paranoia to fail.\n\n");
 		Terminal::print("  The error that has occurred was not specified, so Paranoia cannot be sure\n");
 		Terminal::print("  that it is safe to continue running code.\n");
 	}
+	if (errno == 3) {
+		Terminal::print("  Impossible fail.\n\n");
+
+		Terminal::print("  Possible cases where this could happen are if the kernel has crashed\n");
+		Terminal::print("  already, or a bit-flip due to a cosmic ray occurred.\n");
+	}
+	if (errno == 2) {
+		Terminal::print("  Unimplemented.\n\n");
+
+		Terminal::print("  Read 'extra' under FAULT INFO for more details.\n");
+	}
 	if (errno == 1) {
 		Terminal::print("  This is a generic errno.\n\n");
 
-		Terminal::print("  Read 'extra' under FAULT INFO for more details.");
+		Terminal::print("  Read 'extra' under FAULT INFO for more details.\n");
 	}
 	if (errno == -100) {
 		Terminal::print("  A segmented memory block did not end.\n\n");
 
 		Terminal::print("  Memory integrity cannot be verified, when a\n");
-		Terminal::print("  property of all memory blocks does not exist.");
+		Terminal::print("  property of all memory blocks does not exist.\n");
 	}
 	if (errno == -101) {
 		Terminal::print("  The memory allocator failed to initialize.\n\n");
 
 		Terminal::print("  Most programs will not run in this state, so it\n");
-		Terminal::print("  makes sense not to even try.");
+		Terminal::print("  makes sense not to even try.\n");
+	}
+	if (errno == -102) {
+		Terminal::print("  Out of memory.\n\n");
+
+		Terminal::print("  The system has run out of memory, and could not\n");
+		Terminal::print("  continue execution.\n");
+	}
+	if (errno == -103) {
+		Terminal::print("  Unspecified allocation failure.\n");
 	}
 	if (errno == -200) {
 		Terminal::print("  GDT parameters invalid.\n\n");
 
 		Terminal::print("  This means that the Global Descriptor Table\n");
-		Terminal::print("  could not properly implement a memory map.");
+		Terminal::print("  could not properly implement a memory map.\n");
 	}
 	if (errno == -300) {
 		Terminal::print("  IDT failure.\n\n");
 
 		Terminal::print("  Something happened that guarantees that the IDT is not working, such as a \n");
-		Terminal::print("  guaranteed interrupt not occurring.");
+		Terminal::print("  guaranteed interrupt not occurring.\n");
+	}
+	if (errno == -400) {
+		Terminal::print("  Driver failure. (not specified)\n\n");
+
+		Terminal::print("  Something went wrong in a driver!\n");
+	}
+
+	// deprecated in indev-2026-01-25
+	// superceded by errno -403, -404, and -405
+	if (errno == -401) {
+		Terminal::print("  Driver failure. (ps2general)\n");
+		Terminal::print("    (this is a deprecated error.)\n");
+		Terminal::print("  The PS/2 Controller driver failed to perform a task.\n");
+	}
+
+	// deprecated in indev-2026-01-25
+	// superceded by errno -403, -404, and -405
+	if (errno == -402) {
+		Terminal::print("  Driver failure. (ps2keyboard)\n");
+		Terminal::print("    (this is a deprecated error.)\n");
+		Terminal::print("  The PS/2 Keyboard driver failed to perform a task.\n");
+	}
+
+	if (errno == -403) {
+		Terminal::print("  Mandatory Driver Failure.\n\n");
+
+		Terminal::print("  A driver mandatory for Boot failed to perform a task.\n");
+	}
+	if (errno == -404) {
+		Terminal::print("  Driver Failure.\n\n");
+
+		Terminal::print("  A driver failed to perform a task.\n");
+	}
+	if (errno == -405) {
+		Terminal::print("  Extension Driver Failure.\n\n");
+
+		Terminal::print("  An extension driver failed to perform a task.\n");
+	}
+	if (errno == -500) {
+		Terminal::print("  ACPI failure.\n\n");
+
+		Terminal::print("  Failed to find the RSDP in the ACPI.\n");
+	}
+	if (errno == -600) {
+		Terminal::print("  Fault from userspace.\n\n");
+
+		Terminal::print("  Refer to extra information.\n");
+	}
+	if (errno == -700) {
+		Terminal::print("  Invalid page table index.\n\n");
+
+		Terminal::print("  Attempted to map or access an invalid page.\n");
+	}
+	if (errno == -701) {
+		Terminal::print("  Paging was initialized twice.\n\n");
+
+		Terminal::print("  This is guaranteed to be a bug. Please report this.\n");
+	}
+	if (errno == -800) {
+		Terminal::print("  Faulting Disk drive has errors.\n\n");
+
+		Terminal::print("  A disk drive with an error mode set to 'Fault' is not clean.\n");
+	}
+	if (errno == -801) {
+		Terminal::print("  Filesystem has errors.\n\n");
+
+		Terminal::print("  Refer to extra for details.\n");
+	}
+	if (errno == -900) {
+		Terminal::print("  Scheduler failed to switch contexts.\n\n");
+
+		Terminal::print("  The scheduler attempted, and failed, to switch to userspace.\n");
+	}
+	if (errno == -1000) {
+		Terminal::print("  The Multiboot header is incorrect.\n\n");
+
+		Terminal::print("  Refer to extra for details.\n");
 	}
 	setError(1000);
 }
 
+void fault(int errno,char* string) {
+	fault(errno,string,nullptr);
+}
+
 void fault(int errno) {
-	fault(errno,nullptr);
+	fault(errno,nullptr,nullptr);
+}
+
+void warn(char* string) {
+	Terminal::print("Something in the Kernel emitted a warning:\n");
+	Terminal::print("  ");
+	Terminal::print(string);
+	Terminal::print("\n");
 }
 
 

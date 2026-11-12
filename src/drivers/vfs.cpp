@@ -115,11 +115,10 @@ namespace VFS {
             i++;
         }
         Terminal::print("(failed)\n");
-        while(1){}
         return -1;
     }
     const char* getTargetPath(const char* path) {
-        // HACK: is this supposed to just return `path`? what is this even used for??
+        // NOTE: is this supposed to just return `path`? what is this even used for??
         int i = 1;
         while (path[i] != '/') {
             i++;

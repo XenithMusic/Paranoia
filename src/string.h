@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdint.h>
 
 /*
 
@@ -15,7 +16,7 @@ You should have received a copy of the GNU General Public License along with Par
 
 size_t strlen(const char* str);
 bool stringSafe(const char* str);
-char* stringConcat(const char* a, const char* b);
+// char* stringConcat(const char* a, const char* b);
 char* parseInt(int inNum, char* str, int base);
 char* parseInt(int inNum, int base);
 char* parseU32(uint32_t inNum, char* str, int base);

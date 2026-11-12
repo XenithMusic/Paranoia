@@ -52,8 +52,8 @@ char* stringConcat(const char* a, const char* b) {
     // buffer[lenA + lenB] = '\0';
 
     // return buffer;
-    a = a;
-    b = b;
+    // a = a;
+    // b = b;
     return 0;
 }
 char* parseInt(int inNum, char* str, int base) {

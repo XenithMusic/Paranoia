@@ -45,7 +45,6 @@ def escape_shell_string(input_str):
 
 constants = {
 	"CONST_VERSION":"\"early-0.1.0\"",
-    "CONST_DEBUGGING":"false",
     "BITS32":"true",
 }
 

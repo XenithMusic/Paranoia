@@ -67,6 +67,7 @@ extern "C" {
 		switch (vector) {
 			case 0x20: __asm__ __volatile__("int $0x20"); break;
 			case 0x21: __asm__ __volatile__("int $0x21"); break;
+			case 0x73: __asm__ __volatile__("int $0x73"); break;
 			case 0x80: __asm__ __volatile__("int $0x80"); break;
 			default: /* unsupported */ break;
 		}

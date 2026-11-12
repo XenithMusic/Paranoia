@@ -177,8 +177,9 @@ namespace Terminal {
         print(str,true);
     }
     void printdebug(const char* str) {
-        if (CONST_DEBUGGING)
-            return print(str);
+        #ifdef CONST_DEBUGGING
+        return print(str);
+        #endif
         return;
     }
     void GPL() {

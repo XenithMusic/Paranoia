@@ -1407,3 +1407,15 @@ struct InterruptFrame {
 // ??
 
 // 0020, 2230, 00, 78, 6a, b5
+
+template <typename T>
+struct Optional {
+    bool present = false;
+    T value;
+};
+
+struct IDTDispatchArgs {
+    int index;
+    InterruptFrame* frame;
+    uint32_t errorCode;
+};

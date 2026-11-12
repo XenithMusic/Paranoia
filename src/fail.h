@@ -17,7 +17,7 @@ void setError(int errno);
 void assert(bool dontcrash);
 int getError();
 void clearError();
-void fault(int errno,const char* string,char* source);
+void fault(int errno,const char* string,const char* source);
 void fault(int errno,const char* string);
 void fault(int errno);
 void warn(const char* string);

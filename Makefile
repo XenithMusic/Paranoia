@@ -17,7 +17,7 @@ CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isr.o isras.o syscall.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_video.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isrs.o syscall.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_video.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -63,8 +63,8 @@ fail.o: src/fail.cpp
 idt.o: src/idt.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-isr.o: src/isr.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
+isrs.o: src/isrs.cpp
+	$(CC) $(CFLAGS) -mgeneral-regs-only -c $< -o $@
 
 gdt.o: src/gdt.cpp
 	$(CC) $(CFLAGS) -c $< -o $@

@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "fail.h"
 #include "string.h"
+#include "const.h"
 
 /*
 
@@ -25,7 +26,7 @@ namespace ps2general {
     const uint8_t ENABLE_PORT_2 = 0xA8;
 
     const uint8_t READ_CONFIG_BYTE = 0x20;
-    const uint8_t WRITE_CONFIG_BYTE = 0x20;
+    const uint8_t WRITE_CONFIG_BYTE = 0x60;
 
     const uint8_t SELF_TEST = 0xAA;
     const uint8_t TEST_PORT_1 = 0xAB;
@@ -38,7 +39,7 @@ namespace ps2general {
     const uint8_t ACK = 0xFA;
     const uint8_t TIMEOUT_PSEUDO = 0x00;
 
-    const uint32_t PS2_PRESENT_FLAG = 0x01;
+    const uint32_t PS2_PRESENT_FLAG = 0x02;
 
     bool verifyPS2Controller(FADTTable* table) {
         return (table->flags & PS2_PRESENT_FLAG) != 0x00;
@@ -126,7 +127,8 @@ namespace ps2general {
             return PS2Timeout;
         }
 
-        config &= 0b00110100; // clear bits 0, 4, and 6 -- WRONG, CLEAR 0, 1, 4, and 6 (0b01101011)
+        config &= 0b11111111; // clear bit ~~6~~ (bit 6 enables translating set 2 to set 1.)
+        config |= 0b01000000; // set bit 0 and 6
 
         sendCommand16(WRITE_CONFIG_BYTE,config);
 
@@ -186,12 +188,14 @@ namespace ps2general {
         if (portOneWorking) {
             Terminal::printdebug("Enabled port one.\n");
             sendCommand(ENABLE_PORT_1);
-            config |= 0b00010001;
+            config |= 0b00000001;
+            config &= 0b11101111;
         }
         if (portTwoWorking) {
             Terminal::printdebug("Enabled port two.\n");
             sendCommand(ENABLE_PORT_2);
-            config |= 0b00100010;
+            config |= 0b00000010;
+            config &= 0b11011111;
         }
 
         sendCommand16(WRITE_CONFIG_BYTE,config); // update the IRQs in the config
@@ -206,8 +210,8 @@ namespace ps2general {
             if (not waitForReadReady(10000)) {
                 portOnePopulated = false;
             } else {
-                responses[1] = inb(DATA_PORT);
-                if (responses[1] == 0xFC) {
+                responses[0] = inb(DATA_PORT);
+                if (responses[0] == 0xFC) {
                     portOnePopulated = false;
                     portOneWorking = false;
                 } else {
@@ -216,7 +220,7 @@ namespace ps2general {
                         portOneWorking = false;
                         // unexpected; it was working before
                     }
-                    responses[2] = inb(DATA_PORT);
+                    responses[1] = inb(DATA_PORT);
                 }
             }
             if (portOneWorking and portOnePopulated) {

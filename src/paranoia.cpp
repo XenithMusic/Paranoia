@@ -65,30 +65,31 @@ extern "C" {
 
     char* str; // pointer if anything demands a pointer
     multiboot_info_t* g_mbi;
-    IDTEntry* g_idt;
-    uint8_t k_stack_new[8192];
+    uint8_t* k_stack_top;
+    uint8_t k_stack_new[65536];
     uint8_t u_stack_demo[8192];
     ACPITables rsdt;
     TSS32 tss = {0};
 
-    void GDTinitialized(IDTEntry* idt,multiboot_info_t* mbi);    
-    void PagingInitialized(IDTEntry* idt,multiboot_info_t* mbi);
+    void GDTinitialized(multiboot_info_t* mbi);    
+    void PagingInitialized(multiboot_info_t* mbi);
     void AfterAllProcesses();
     void kernel_main(multiboot_info_t* mbi) {
         // Initialize GDT as the VERY FIRST THING YOU DO.
         GDTEntry* gdt = (GDTEntry*)0x1000; // Define GDT pointer at a fixed memory location
-        tss.esp0 = (uint32_t)k_stack_new;
+        k_stack_top = k_stack_new + sizeof(k_stack_new);
+        tss.esp0 = (uint32_t)k_stack_top;
         GDTPointer gdtpointer = initGDT(gdt,&tss);
-        __attribute__((aligned(0x10))) 
-        IDTEntry* idt = (IDTEntry*)((uint32_t)gdt + gdtpointer.limit + 1); // Define IDT pointer immediately following the GDT
+        // __attribute__((aligned(0x10))) 
+        // IDTEntry* idt = (IDTEntry*)((uint32_t)gdt + gdtpointer.limit + 1); // Define IDT pointer immediately following the GDT
         // Now that we have a GDT, we can continue kernel initialization.
-        GDTinitialized(idt,mbi);
+        GDTinitialized(mbi);
     }
-    void GDTinitialized(IDTEntry* idt,multiboot_info_t* mbi) {
+    void GDTinitialized(multiboot_info_t* mbi) {
         Paging::initwkp(); // Initialize Paging as the VERY SECOND THING YOU DO.
-        PagingInitialized(idt,mbi);
+        PagingInitialized(mbi);
     }
-    void PagingInitialized(IDTEntry* idt,multiboot_info_t* mbi) {
+    void PagingInitialized(multiboot_info_t* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
 
         Allocator::init();
@@ -151,54 +152,65 @@ extern "C" {
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print(")\n\n");
         
-        initIDT(idt);
+        // initIDT(idt);
+        IDT::init();
+        IDT::addDefaults();
+        IDT::finish();
 
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] IDT initialized.");
             Terminal::print("\n");
         
-        g_idt = idt;
         g_mbi = mbi;
 
         __asm__ __volatile__ (
             "mov %0, %%esp\n"
             "xor %%ebp, %%ebp\n"
             "call PostRestack\n"
-            : : "r"(k_stack_new) : "memory"
+            : : "r"(k_stack_top) : "memory"
         );
     }
     void PostRestack() {
         // if (!(g_mbi->flags & (1<<12))) {
         //     fault(-1000,"Expected a framebuffer.","PostRestack");
         // }
-        Terminal::print("\n:: DRIVERS (");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print(")\n\n");
-        
-        drivermanager::init(&rsdt,g_mbi);
 
-        VFS::mount(VFS::FilesystemType::ext2,disk::ATA,disk_ata::ATADrive::MASTER,0,"primary");
-        VFS::File file = VFS::getFileFromPath("/primary/sys/state/compiled/kernelsize");
-        fid_t fid = VFS::openFile(file);
-        double kernelSize = 0;
-        VFS::readFile(fid,0,sizeof(double),&kernelSize);
-        VFS::closeFile(fid);
+        {
 
-        Terminal::print("System information:\n");
-        Terminal::print("KERNEL:               PARANOIA\n");
-        Terminal::print("- VERSION:            ");
-            Terminal::print(CONST_VERSION);
-            Terminal::print("\n");
-        Terminal::print("- COMPILATION DATE:   ");
-            Terminal::print(CONST_COMPDATE);
-            Terminal::print("\n");
-        Terminal::print("- AUTHORED BY:        ");
-            Terminal::print(CONST_AUTHOR);
-            Terminal::print("\n");
-        Terminal::print("- KERNEL SIZE:        ");
-            Terminal::print(parseDouble(kernelSize/MEBIBYTES,str,2));
-            Terminal::print("MiB\n");
+            Terminal::print("\n:: DRIVERS (");
+                Terminal::print(parseDouble(get_pit_seconds(),str,10));
+                Terminal::print(")\n\n");
+            
+            drivermanager::init(&rsdt,g_mbi);
+
+            VFS::mount(VFS::FilesystemType::ext2,disk::ATA,disk_ata::ATADrive::MASTER,0,"primary");
+        }
+        {
+            char path[] = "/primary/sys/state/compiled/kernelsize";
+            VFS::File file = VFS::getFileFromPath(path);
+            fid_t fid = VFS::openFile(file);
+            double kernelSize = 0;
+            VFS::readFile(fid,0,sizeof(double),&kernelSize);
+            VFS::closeFile(fid);
+
+            Terminal::print("System information:\n");
+            Terminal::print("KERNEL:               PARANOIA\n");
+            Terminal::print("- VERSION:            ");
+                Terminal::print(CONST_VERSION);
+                Terminal::print("\n");
+            Terminal::print("- COMPILATION DATE:   ");
+                Terminal::print(CONST_COMPDATE);
+                Terminal::print("\n");
+            Terminal::print("- AUTHORED BY:        ");
+                Terminal::print(CONST_AUTHOR);
+                Terminal::print("\n");
+            Terminal::print("- KERNEL SIZE:        ");
+                Terminal::print(parseDouble(kernelSize/MEBIBYTES,str,2));
+                Terminal::print("MiB\n");
+        }
+
+        // hang here.
 
         // START OF FS TESTING STUFF !!!
 
@@ -315,14 +327,18 @@ extern "C" {
         // Terminal::print(test);
         //     Terminal::print("\n\n");
 
-        Terminal::print("\n:: SERVICES (");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print(")\n\n");
-        scheduler::init();
-        Terminal::print("[");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] Scheduler initialized.");
-            Terminal::print("\n");
+        {
+            Terminal::print("\n:: SERVICES (");
+                Terminal::print(parseDouble(get_pit_seconds(),str,10));
+                Terminal::print(")\n\n");
+            {
+                scheduler::init();
+                Terminal::print("[");
+                    Terminal::print(parseDouble(get_pit_seconds(),str,10));
+                    Terminal::print("] Scheduler initialized.");
+                    Terminal::print("\n");
+            }
+        }
         
         // ext2::Superblock* superblock;
         // ext2::get_superblock(superblock);
@@ -334,6 +350,8 @@ extern "C" {
         // char buffer[4096];
         // ext2::read_block(0,4096,buffer);
         // Terminal::print(buffer);
+
+
         char temporaryProcessPath[] = "/primary/demo/helloearly.lex";
         warn("A temporary .LEX init process is being used. (");
         warn(temporaryProcessPath);
@@ -349,6 +367,8 @@ extern "C" {
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Created init process.");
             Terminal::print("\n");
+        
+        
         // scheduler::tick();
         // while (1){}
 
@@ -357,9 +377,9 @@ extern "C" {
         // - init scheduler
         // - create first task and notify the scheduler
 
-        if (CONST_DEBUGGING) {
+        #ifdef CONST_DEBUGGING
             Terminal::print("!! WARNING: Running in debug mode, output may be far more verbose than usual!\n");
-        }
+        #endif
         
         // // You can add more setup here (keyboard, time, etc.)
 
@@ -397,18 +417,18 @@ extern "C" {
         //     Terminal::printdebug("[DEBUG CHECK] Succeeded. (PAGING IS DISABLED)\n");
         #endif
 
-        double lastTick;
-        double tick;
+        double lastTick = 0;
+        double tick = 0;
 
-        // temporary busy-loop. handoff to the scheduler here.
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Entering scheduler!");
             Terminal::print("\n");
-        
-        sti();
+
+        Terminal::print("something after that. Trademark.");
 
         while (1) {
+            IDT::handleQueue();
             tick = get_pit_seconds();
             if (lastTick+0.01 < tick) {
                 lastTick = tick;
@@ -417,10 +437,7 @@ extern "C" {
                     not ps2keyboard::keysDown[KeyCode::MODIF_ANY_ALT] and 
                     not ps2keyboard::keysDown[KeyCode::MODIF_ANY_META] and 
                     ps2keyboard::keysDown[KeyCode::ALPHA_T]) {
-                    Terminal::print("[");
-                        Terminal::print(parseDouble(tick,str,10));
-                        Terminal::print("] Keybind message print.");
-                        Terminal::print("\n");
+                    Terminal::print("a");
                 } else {
                     const Pair<KeyCode, char>* list = codesAscii;
                     if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT]) {
@@ -449,7 +466,6 @@ extern "C" {
         AfterAllProcesses();
     }
     void AfterAllProcesses() {
-        busy_sleep(5.0);
         
         // TODO: Somehow, I need to shut down the computer. In the meantime, I'm just gonna print and halt.
         Terminal::clearScreen();

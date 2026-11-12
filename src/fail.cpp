@@ -60,7 +60,7 @@ void clearError() {
 	error = 0;
 }
 
-void fault(int errno,const char* string,char* source) {
+void fault(int errno,const char* string,const char* source) {
 	outstr(COM1,"FAULT");
 	cli(); // prevent interrupts causing unexpected fault exiting
 	char* str;

@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License along with Par
 #endif
 
 #ifndef CONST_AUTHOR
-#define CONST_AUTHOR "cookiiq (with help from OSDev.org, copilot and chatgpt)"
+#define CONST_AUTHOR "cookiiq (with help from OSDev.org, and chatgpt)"
 #endif
 
 #ifndef CONST_KERNELSIZE
@@ -33,3 +33,4 @@ You should have received a copy of the GNU General Public License along with Par
 #define KIBIBYTES 1024
 #define MEBIBYTES 1048576
 #define GIBIBYTES 1073741824
+#define TEBIBYTES 1099511627776

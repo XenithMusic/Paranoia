@@ -48,6 +48,19 @@ namespace Paging {
         invalidatePage(virt);
     }
 
+    /**
+     * Flags:
+     * Bit 0: Present (set this if this memory exists)
+     * Bit 1: R/W (set this if this memory should be user-writable)
+     * Bit 2: U/S (set this if this should be user-accessible)
+     * Bit 3: PWT (set to use write-through caching instead of write-back.)
+     * Bit 4: PCD (set this to disable caching)
+     * Bit 5: A (set this if a PageDirectoryEntry or PageTableEntry was read during virtual address translation.)
+     * Bit 6: D (set this if the page has been written to)
+     * Bit 7: PAT (set to 0 cuz idk what this is)
+     * Bit 8: G (set to prevent invalidating the TLB entry for this page on MOV to CR3 instruction.)
+     * Bit 9-11: OS specific
+     */
     void mapArbitraryRange(PageDirectory* pd, uint32_t virt_start, uint32_t phys_start, uint32_t size, uint32_t flags) {
         uint32_t virt = virt_start;
         uint32_t phys = phys_start;

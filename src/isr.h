@@ -20,6 +20,6 @@ extern "C" {
     void basic_eoi_handler_low();
     void basic_eoi_assembly_high();
     void basic_eoi_handler_high();
-    void syscall();
-    void syscall_c(int id,int arg1,int arg2,int arg3);
+    void syscall_assembly();
+    void syscall_handler();
 }

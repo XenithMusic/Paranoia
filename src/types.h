@@ -23,12 +23,17 @@ You should have received a copy of the GNU General Public License along with Par
 // #endif
 // #endif
 
+
 #pragma once
 
 typedef uint64_t ubyte8_t;
 typedef uint32_t ubyte4_t;
 typedef uint16_t ubyte2_t;
 typedef uint8_t ubyte1_t;
+typedef int64_t byte8_t;
+typedef int32_t byte4_t;
+typedef int16_t byte2_t;
+typedef int8_t byte1_t;
 
 typedef ubyte1_t ubyte_t;
 
@@ -73,7 +78,7 @@ struct Framebuffer {
 } __attribute__((packed));
 
 // directly from chatgpt for testing to see if this is actually correct
-typedef struct {
+struct multiboot_info_t {
     uint32_t flags;        // bitfield
     uint32_t mem_lower;
     uint32_t mem_upper;
@@ -88,7 +93,7 @@ typedef struct {
     // --- framebuffer info ---
     Framebuffer framebuffer;
     uint8_t  reserved[2];          // padding
-} multiboot_info_t;
+};
 
 enum MBlockState : char {
     USED = 0,
@@ -132,38 +137,262 @@ struct Date {
     uint8_t mode;
 };
 
-namespace scheduler {
-    struct Process {
-        bool valid;
-        // state
-        uint32_t EAX;
-        uint32_t EBX;
-        uint32_t ECX;
-        uint32_t EDX;
-        uint32_t ESI;
-        uint32_t EDI;
-        uint32_t EBP;
-        uint32_t ESP;
-        // uint64_t R8;
-        // uint64_t R9;
-        // uint64_t R10;
-        // uint64_t R11;
-        // uint64_t R12;
-        // uint64_t R13;
-        // uint64_t R14;
-        // uint64_t R15;
+typedef uint32_t PageTableEntry;
 
-        uint32_t EIP;
-        uint16_t CS;
-        uint16_t DS;
-        uint16_t SS;
-        uint16_t ES;
-        uint16_t FS;
-        uint16_t GS;
-        uint32_t EFLAGS;
-        uint32_t CR3;
+struct PageTable {
+    PageTableEntry entries[1024];
+};
+
+typedef uint32_t PageDirectoryEntry;
+
+struct PageDirectory {
+    PageDirectoryEntry entries[1024] = {};
+};
+
+#define PTE_PRESENT   0x1
+#define PTE_WRITABLE  0x2
+#define PTE_USER      0x4
+#define PDE_BIGPAGE   0x80
+
+namespace scheduler {
+    struct ProcessContext {
+        uint32_t eax, ebx, ecx, edx = 0;
+        uint32_t esi, edi = 0;
+        uint32_t ebp, esp = 0;
+
+        uint32_t eip, eflags = 0;
+
+        uint32_t cs,ds,ss = 0;
+    };
+    struct Process {
+        pid_t parentPid;
+        size_t ticksSinceRun;
+        // 1 runs every tick, 2 runs every other tick, etc
+        size_t ticksPerRun;
+        PageDirectory* pageDirectory;
+        void* entrypoint;
+        void* memoryBase;
+
+        ProcessContext ctx;
     };
 };
+
+namespace LEXLoader {
+    /*
+    Custom executable format!
+
+    LEX - Linkable Executable
+
+    Format:
+    - Header
+    - MemSection[]
+    */
+
+    // defines how this file should be linked.
+    enum LEXLinkerMode : uint32_t {
+        // don't link; all libraries needed
+        // are embedded.
+        STATIC,
+        // do link; a linker is specified
+        // in the header, as a POSIX-compliant
+        // path, skipping the mountpoint.
+        // /primary/lib/ld is illegal, and
+        // /lib/ld would be legal.
+        // if the linker occurs on a different
+        // mount point, this cannot be used.
+        DYNAMIC_UNIFIED,
+        // do link; a linker is specified
+        // in the header. this is NOT a POSIX-
+        // -compliant path, as it does not
+        // skip the mountpoint.
+        // /primary/lib/ld is legal, and
+        // /lib/ld is illegal.
+        DYNAMIC_PARTITIONED
+    };
+    enum LEXArchitecture : uint16_t {
+        X86_32,
+        X86_64,
+        ARM32,
+        ARM64
+    };
+    enum LEXEndian : uint8_t {
+        LSB,
+        MSB
+    };
+    struct LEXHeader {
+        // 0 is invalid.
+        // changelog follows.
+        /*
+        1:
+            +uint32_t version
+            +LEXLinkerMode linkerMode
+            +uint32_t memorySections
+            +uint32_t expectedBase
+            +uint32_t GOTIdx
+            +uint32_t headerSize
+            +char* linker
+        2:
+            -char* linker
+            +char linker[256]
+        3:
+            LEXHeader
+                +char magic[4]
+                +uint16_t architecture
+                +uint8_t endianness
+            LEXMemSection
+                +size_t paddingAfter
+                +uint8_t permissions
+        4:
+            LEXHeader
+                +uint32_t expectedMemorySize
+            LEXMemSection
+                *uint8_t flags
+                    (overwrites reserved[0])
+        */
+        char magic[4]; // "LEX\x42"
+        LEXArchitecture architecture;
+        LEXEndian endianness;
+        uint8_t reserved;
+        uint32_t version;
+        LEXLinkerMode linkerMode;
+        uint32_t memorySections;
+        // the first place in memory where this should be loaded to
+        uint32_t expectedBase;
+        // section index of the GOT. 0 if statically linked.
+        uint32_t GOTIdx;
+        // size of the LEXHeader in bytes.
+        // version 1 should be 64.
+        // version 2 should be 280 or 512.
+        // version 3 should be 287 or 512.
+        uint32_t headerSize;
+        // only includes the non-data section
+        uint32_t memSectionSize;
+        // the sum of all MemSection's size and
+        // paddingAfter values.
+        uint32_t expectedMemorySize;
+        uint32_t entrypoint;
+        // \0 terminated cstr
+        char linker[256];
+    };
+    struct LEXMemSection {
+        uint32_t size;
+        // this is zero-initialized.
+        uint32_t paddingAfter;
+        /**
+         * 0x2: userspace w
+         * 0x4: userspace r
+         */
+        uint8_t pageFlags;
+        /**
+         * 0x1: zero padding area (.bss-like)
+         */
+        uint8_t flags;
+        uint8_t reserved[2];
+        uint8_t* data;
+    };
+}
+
+namespace ELFLoader {
+    typedef ubyte4_t addr_t;
+    typedef uint16_t half_t;
+    typedef ubyte4_t off_t;
+    typedef byte4_t sword_t;
+    typedef ubyte4_t word_t;
+    enum ELFType : half_t {
+        NONE=0,
+        REL=1,
+        EXEC=2,
+        DYN=3,
+        CORE=4,
+        LOPROC=0xff00,
+        HIPROC=0xffff
+    };
+    enum ELFMachine : half_t {
+        M_NONE=0,
+        M_M32,
+        M_SPARC,
+        M_386,
+        M_68K,
+        M_88K,
+        M_860=7,
+        M_MIPS_3K,
+        M_MIPS_4K=10
+    };
+    struct ELFSectionHeader {
+        word_t name;
+        word_t type;
+        /*
+        0x1: SHF_WRITE -- should be writable
+        0x2: SHF_ALLOC -- "this section occupies memory during process execution"
+        0x4: SHF_EXECINSTR -- executable
+        0xf0000000: SHF_MASKPROC -- idk
+        */
+        word_t flags;
+        // expected first byte in memory
+        addr_t addr;
+        // offset from the beginning of the file to the first byte
+        off_t offset;
+        // size in bytes
+        word_t size;
+        // dependent on section type
+        /*
+        key: `sh_type: meaning`
+        dynamic: section header index of the string table used by entrties in this section
+        hash: section header index of the symbol table to which the hash table applies
+        rel, rela: section header index of the associated symbol table
+        symtab, dynsym: os specific
+        */
+        word_t link;
+        // not sure what this is
+        // dependent on section type
+        /*
+        key: `sh_type: meaning`
+        dynamic: none
+        hash: none
+        rel, rela: section header index of the section to which the relocation applies
+        symtab, dynsym: os specific
+        */
+        word_t info;
+        // not sure what this is
+        // validation note; this must be 0, or a positive power of two
+        word_t addralign;
+        // 0 if not applicable
+        word_t entrysize;
+    };
+    struct ELFHeader {
+        unsigned char ident[16];
+        // 
+        ELFType type;
+        /* required architecture.
+           we should be expecting M_386*/
+        ELFMachine machine;
+        word_t version;
+        addr_t entrypoint;
+        // program header table's file offset (bytes)
+        // 0 if nonexistant
+        off_t phoff;
+        // section header table's file offset (bytes)
+        // 0 if nonexistant
+        off_t shoff;
+        // find in documentation
+        word_t flags;
+        // elf header size in bytes
+        half_t ehsize;
+        // size of program header entry
+        half_t phentrysize;
+        // number of entries in program header
+        half_t phnum;
+        // size of section header entry
+        half_t shentsize;
+        // number of entries in section header
+        half_t shnum;
+        // from https://refspecs.linuxfoundation.org/elf/elf.pdf
+        //
+        // This member holds the section header table index of the entry associated with the
+        // section name string table.
+        half_t shstrndx;
+    } __attribute__((packed));
+}
 
 namespace MBR {
     struct PTableEntry {
@@ -918,6 +1147,23 @@ enum syscall_id {
     // SCALL_SUSPEND = 903 // EC
 };
 
+struct SyscallArguments {
+    syscall_id id;
+    union {
+        struct {
+            // no args
+        } exit;
+    };
+} __attribute__((packed));
+
+struct SyscallReturns {
+    union {
+        struct {
+            // no return
+        } exit;
+    };
+} __attribute__((packed));
+
 enum ps2device {
     ANCIENT = 0, // Ancient AT Keyboard
     PS2MOUSE = 1, // Standard PS/2 Mouse
@@ -1093,6 +1339,14 @@ struct FADTTable {
     ACPI_generic_register_position x_gpe_1_block;
 };
 
+struct InterruptFrame {
+    uint32_t eip;
+    uint32_t cs;
+    uint32_t eflags;
+    uint32_t useresp;
+    uint32_t ss;
+};
+
 // struct PageTableEntry {
 //     uint32_t address12 : 20;
 //     uint32_t avl : 3;
@@ -1120,23 +1374,6 @@ struct FADTTable {
 //     uint32_t avl : 3;
 //     uint32_t address12 : 20;
 // };
-
-typedef uint32_t PageTableEntry;
-
-struct PageTable {
-    PageTableEntry entries[1024];
-};
-
-typedef uint32_t PageDirectoryEntry;
-
-struct PageDirectory {
-    PageDirectoryEntry entries[1024] = {};
-};
-
-#define PTE_PRESENT   0x1
-#define PTE_WRITABLE  0x2
-#define PTE_USER      0x4
-#define PDE_BIGPAGE   0x80
 
 // struct PageDirectoryEntry {
 //     // 1 if in physical memory.

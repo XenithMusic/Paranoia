@@ -43,7 +43,7 @@ extern "C" {
 		__asm__ __volatile__ ("outw %0, %1" : : "a" (val), "Nd" (port));
 	}
 
-	void outstr(uint16_t port, char* val) {
+	void outstr(uint16_t port, const char* val) {
 		while (*val != '\0') {
 			outb(port,*val);
 			val += 1;

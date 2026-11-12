@@ -44,7 +44,7 @@ void setError(int errno) {
 	}
 }
 
-void fault(int errno,char* string);
+void fault(int errno,const char* string);
 
 void assert(bool dontcrash) {
 	if (dontcrash == false) {
@@ -60,16 +60,16 @@ void clearError() {
 	error = 0;
 }
 
-void fault(int errno,char* string,char* source) {
+void fault(int errno,const char* string,char* source) {
 	outstr(COM1,"FAULT");
 	cli(); // prevent interrupts causing unexpected fault exiting
 	char* str;
 	Terminal::init();
 	Terminal::clearScreen();
 	Terminal::setRow(0);
-	Terminal::print("A significant error (a FAULT) occurred in the Paranoia\n");
-		Terminal::print("kernel, and it needed to stop executing immediately.\n\n");
-	Terminal::print("FAULT INFO\n");
+	Terminal::print("A critical error (a FAULT) occurred in the Paranoia\n");
+		Terminal::print("kernel, and it needed to stop executing immediately.\n");
+	Terminal::print("DETAILS\n");
 	Terminal::print("  Code:  ");
 		Terminal::print(parseInt(errno,str,10));
 		Terminal::print("\n");
@@ -84,7 +84,7 @@ void fault(int errno,char* string,char* source) {
 		Terminal::print("\n");
 	}
 	Terminal::print("  Stack Trace:\n\n");
-	stackTrace(20);
+	stackTrace(10);
 	Terminal::print("\n");
 	Terminal::print("Your computer will not restart itself.\n\n");
 	Terminal::print("FAULT specific details:\n");
@@ -108,7 +108,7 @@ void fault(int errno,char* string,char* source) {
 		Terminal::print("  already, or a bit-flip due to a cosmic ray occurred.\n");
 	}
 	if (errno == 2) {
-		Terminal::print("  Unimplemented.\n\n");
+		Terminal::print("  Unimplemented. This should not occur in a stable release.\n\n");
 
 		Terminal::print("  Read 'extra' under FAULT INFO for more details.\n");
 	}
@@ -120,8 +120,8 @@ void fault(int errno,char* string,char* source) {
 	if (errno == -100) {
 		Terminal::print("  A segmented memory block did not end.\n\n");
 
-		Terminal::print("  Memory integrity cannot be verified, when a\n");
-		Terminal::print("  property of all memory blocks does not exist.\n");
+		Terminal::print("  Memory integrity cannot be verified, when an\n");
+		Terminal::print("  invariant is not present. Corruption is assumed.\n");
 	}
 	if (errno == -101) {
 		Terminal::print("  The memory allocator failed to initialize.\n\n");
@@ -230,7 +230,7 @@ void fault(int errno,char* string,char* source) {
 	setError(1000);
 }
 
-void fault(int errno,char* string) {
+void fault(int errno,const char* string) {
 	fault(errno,string,nullptr);
 }
 
@@ -238,7 +238,7 @@ void fault(int errno) {
 	fault(errno,nullptr,nullptr);
 }
 
-void warn(char* string) {
+void warn(const char* string) {
 	Terminal::print("Something in the Kernel emitted a warning:\n");
 	Terminal::print("  ");
 	Terminal::print(string);
@@ -255,7 +255,7 @@ void panic(int errno,char* string) { fault(errno,string); }
 // deprecated in indev-2024-11-23
 // superceded by fault(int, char*)
 
-void panic(int errno) { fault(errno,nullptr); }
+void panic(int errno) { fault(errno,"String unspecified from legacy panic call."); }
 // introduced in indev-2024-11-23
 // deprecated in indev-2024-11-23
 // superceded by fault(int)

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "scheduler.h"
 #include "terminal.h"
 #include "syscall.h"
 #include "string.h"
@@ -16,10 +17,10 @@
 // DRIVERS
 
 #include "drivers/driverman.h"
-#include "drivers/genericdisk.h"
 #include "drivers/ext2.h"
 #include "drivers/ata.h"
 #include "drivers/vfs.h"
+#include "drivers/lex.h"
 #include "vector.h"
 
 /*
@@ -54,7 +55,10 @@ TODO:
 - PS/2 Keyboard Driver
     BUG: Changing scancode sets doesn't work
     TODO: Verify that the PS/2 Controller exists.
+    BUG: Doesn't work at all now???
 
+- Userspace
+    BUG: Entirely broken.
 */
 
 extern "C" {
@@ -69,6 +73,7 @@ extern "C" {
 
     void GDTinitialized(IDTEntry* idt,multiboot_info_t* mbi);    
     void PagingInitialized(IDTEntry* idt,multiboot_info_t* mbi);
+    void AfterAllProcesses();
     void kernel_main(multiboot_info_t* mbi) {
         // Initialize GDT as the VERY FIRST THING YOU DO.
         GDTEntry* gdt = (GDTEntry*)0x1000; // Define GDT pointer at a fixed memory location
@@ -172,6 +177,28 @@ extern "C" {
             Terminal::print(")\n\n");
         
         drivermanager::init(&rsdt,g_mbi);
+
+        VFS::mount(VFS::FilesystemType::ext2,disk::ATA,disk_ata::ATADrive::MASTER,0,"primary");
+        VFS::File file = VFS::getFileFromPath("/primary/sys/state/compiled/kernelsize");
+        fid_t fid = VFS::openFile(file);
+        double kernelSize = 0;
+        VFS::readFile(fid,0,sizeof(double),&kernelSize);
+        VFS::closeFile(fid);
+
+        Terminal::print("System information:\n");
+        Terminal::print("KERNEL:               PARANOIA\n");
+        Terminal::print("- VERSION:            ");
+            Terminal::print(CONST_VERSION);
+            Terminal::print("\n");
+        Terminal::print("- COMPILATION DATE:   ");
+            Terminal::print(CONST_COMPDATE);
+            Terminal::print("\n");
+        Terminal::print("- AUTHORED BY:        ");
+            Terminal::print(CONST_AUTHOR);
+            Terminal::print("\n");
+        Terminal::print("- KERNEL SIZE:        ");
+            Terminal::print(parseDouble(kernelSize/MEBIBYTES,str,2));
+            Terminal::print("MiB\n");
 
         // START OF FS TESTING STUFF !!!
 
@@ -287,16 +314,16 @@ extern "C" {
         // disk::get_bytes(disk_ata::ATADrive::MASTER,0,500,32,test);
         // Terminal::print(test);
         //     Terminal::print("\n\n");
-        while (1){}
 
         Terminal::print("\n:: SERVICES (");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print(")\n\n");
-        
+        scheduler::init();
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Scheduler initialized.");
             Terminal::print("\n");
+        
         // ext2::Superblock* superblock;
         // ext2::get_superblock(superblock);
         // ext2::BlockGroupDescriptor bgd_table[superblock->total_blocks / superblock->group_blocks + 1];
@@ -307,35 +334,29 @@ extern "C" {
         // char buffer[4096];
         // ext2::read_block(0,4096,buffer);
         // Terminal::print(buffer);
+        char temporaryProcessPath[] = "/primary/demo/helloearly.lex";
+        warn("A temporary .LEX init process is being used. (");
+        warn(temporaryProcessPath);
+        warn("This should not be seen in a stable release.");
+        scheduler::Process* initProcess = LEXLoader::loadLEXIntoMemory(temporaryProcessPath,0);
         Terminal::print("\n[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Found init executable.");
             Terminal::print("\n");
         // process::load_bin((void*)0x400000,src_inode,128);
+        scheduler::addProcess(initProcess);
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Created init process.");
             Terminal::print("\n");
+        // scheduler::tick();
+        // while (1){}
 
         // no services yet.
         // - init syscalls
         // - init scheduler
         // - create first task and notify the scheduler
 
-        Terminal::print("System information:\n");
-        Terminal::print("KERNEL:               PARANOIA\n");
-        Terminal::print("- VERSION:            ");
-            Terminal::print(CONST_VERSION);
-            Terminal::print("\n");
-        Terminal::print("- COMPILATION DATE:   ");
-            Terminal::print(CONST_COMPDATE);
-            Terminal::print("\n");
-        Terminal::print("- AUTHORED BY:        ");
-            Terminal::print(CONST_AUTHOR);
-            Terminal::print("\n");
-        Terminal::print("- KERNEL SIZE:        ");
-            Terminal::print(parseDouble((double)CONST_KERNELSIZE/4/1024,str,2));
-            Terminal::print("MiB\n");
         if (CONST_DEBUGGING) {
             Terminal::print("!! WARNING: Running in debug mode, output may be far more verbose than usual!\n");
         }
@@ -384,45 +405,50 @@ extern "C" {
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print("] Entering scheduler!");
             Terminal::print("\n");
+        
+        sti();
 
-        // while (1) {
-        //     tick = get_pit_seconds();
-        //     if (lastTick+0.01 < tick) {
-        //         lastTick = tick;
-        //         if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_CONTROL] and 
-        //             ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT] and 
-        //             not ps2keyboard::keysDown[KeyCode::MODIF_ANY_ALT] and 
-        //             not ps2keyboard::keysDown[KeyCode::MODIF_ANY_META] and 
-        //             ps2keyboard::keysDown[KeyCode::ALPHA_T]) {
-        //             Terminal::print("[");
-        //                 Terminal::print(parseDouble(tick,str,10));
-        //                 Terminal::print("] Keybind message print.");
-        //                 Terminal::print("\n");
-        //         } else {
-        //             const Pair<KeyCode, char>* list = codesAscii;
-        //             if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT]) {
-        //                 for (const Pair<KeyCode,char> pair : codesAsciiCapital) {
-        //                     if (ps2keyboard::keysDown[pair.first]) {
-        //                         ps2keyboard::keysDown[pair.first] = false;
-        //                         Terminal::print(&pair.second);
-        //                     }
-        //                 }
-        //             } else {
-        //                 for (const Pair<KeyCode,char> pair : codesAscii) {
-        //                     if (ps2keyboard::keysDown[pair.first]) {
-        //                         ps2keyboard::keysDown[pair.first] = false;
-        //                         Terminal::print(&pair.second);
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //         ps2keyboard::processScancodes();
-        //     }
-        //     // if (ps2keyboard::state.state == EatingScancode)
-        //     //     ps2keyboard::processScancodes();
-        //     // The OS runs here
-        //     // Terminal::swapBuffers();
-        // }
+        while (1) {
+            tick = get_pit_seconds();
+            if (lastTick+0.01 < tick) {
+                lastTick = tick;
+                if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_CONTROL] and 
+                    ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT] and 
+                    not ps2keyboard::keysDown[KeyCode::MODIF_ANY_ALT] and 
+                    not ps2keyboard::keysDown[KeyCode::MODIF_ANY_META] and 
+                    ps2keyboard::keysDown[KeyCode::ALPHA_T]) {
+                    Terminal::print("[");
+                        Terminal::print(parseDouble(tick,str,10));
+                        Terminal::print("] Keybind message print.");
+                        Terminal::print("\n");
+                } else {
+                    const Pair<KeyCode, char>* list = codesAscii;
+                    if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT]) {
+                        for (const Pair<KeyCode,char> pair : codesAsciiCapital) {
+                            if (ps2keyboard::keysDown[pair.first]) {
+                                ps2keyboard::keysDown[pair.first] = false;
+                                Terminal::print(&pair.second);
+                            }
+                        }
+                    } else {
+                        for (const Pair<KeyCode,char> pair : codesAscii) {
+                            if (ps2keyboard::keysDown[pair.first]) {
+                                ps2keyboard::keysDown[pair.first] = false;
+                                Terminal::print(&pair.second);
+                            }
+                        }
+                    }
+                }
+                ps2keyboard::processScancodes();
+            }
+            // if (ps2keyboard::state.state == EatingScancode)
+            //     ps2keyboard::processScancodes();
+            // The OS runs here
+            // Terminal::swapBuffers();
+        }
+        AfterAllProcesses();
+    }
+    void AfterAllProcesses() {
         busy_sleep(5.0);
         
         // TODO: Somehow, I need to shut down the computer. In the meantime, I'm just gonna print and halt.
@@ -432,8 +458,9 @@ extern "C" {
         Terminal::print("I am not joking, I need an AML interpreter, which is painful.\n");
         Terminal::print("I may implement uACPI at some point, however I have not yet done so.\n");
         Terminal::print("(https://uacpi.github.io)\n\n");
-        Terminal::print("Sorry for the inconvenience.\n\n");
-        Terminal::print("Please manually turn off the computer.\n\n");
+
+        Terminal::print("Sorry for the inconvenience, please manually turn the computer off.\n\n");
+
         Terminal::print("Note: If you are using QEMU, Bochs, Virtualbox, or Cloud Hypervisor,\n");
         Terminal::print("  your computer will shut down without intervention in 5 seconds.\n");
         busy_sleep(5.0);

@@ -22,7 +22,7 @@ You should have received a copy of the GNU General Public License along with Par
 #define BLOCK_SIZE 512 // 512B
 #define NUM_BLOCKS MEMORY_POOL_SIZE/BLOCK_SIZE // 512 MiB
 
-#define MEM_START (0x1*MEBIBYTES)
+#define MEM_START (0x4*MEBIBYTES)
 
 #if (NUM_BLOCKS%1) != 0
 #error "(-2032) NUM_BLOCKS should be an integer."
@@ -61,7 +61,8 @@ namespace Allocator {
         MBlock* block = &bitmap[startBlock];
         return block->state != MBlockState::FREE;
     }
-    void *kalloc(size_t size) {
+    void* kalloc(size_t size, size_t alignment) {
+        alignment = (alignment+BLOCK_SIZE-1)/BLOCK_SIZE;
         size_t contiguous = 0;
         size_t needed = (size+BLOCK_SIZE-1)/BLOCK_SIZE; // FATAL: INCOMPLETE IMPL -- HOW SO WHAT AM I MISSING -- FOUND IT LOL
         size_t start = SIZE_MAX;
@@ -72,6 +73,9 @@ namespace Allocator {
             return nullptr;
         }
         for (size_t i = 0;i < NUM_BLOCKS;i++) {
+            if ((alignment > 1) && (start == SIZE_MAX))
+                i = ((i+alignment-1)/alignment)*alignment;
+            if (!(i < NUM_BLOCKS)) break; // enforce loop contract; i'm modifying `i` from inside the loop
             if (bitmap[i].state != FREE) {
                 start = SIZE_MAX;
                 contiguous = 0;
@@ -86,11 +90,22 @@ namespace Allocator {
                 }
                 bitmap[i].isEnd = true;
                 void* ptr = (void*)(MEM_START+start*BLOCK_SIZE);
+                // Terminal::init();
+                // Terminal::print(parseInt((uint32_t)ptr,16));
+                // while(1){}
                 return (void*)ptr;
             }
         }
         fault(-102);
         return nullptr;
+    }
+
+    void* kalloc(size_t size) {
+        return kalloc(size,0);
+    }
+
+    void* kalloc4K() {
+        return kalloc(4096,4096);
     }
 
     void free(void* pointer) {

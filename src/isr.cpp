@@ -83,6 +83,10 @@ extern "C" {
         eoi(1);
         return;
     }
+    void syscall_assembly();
+    void syscall_handler() {
+        
+    }
 
     // NOTE: This IRQ handler does too much, and most of the work has
     //       been moved to drivers/ps2 ps2keyboard::processScancodes().

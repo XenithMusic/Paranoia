@@ -37,7 +37,9 @@ namespace Allocator {
     void init();
 
     bool is_allocated(void* ptr);
-    void *kalloc(size_t size);
+    void* kalloc(size_t size, size_t alignment);
+    void* kalloc(size_t size);
+    void* kalloc4K();
 
     void free(void* pointer);
 

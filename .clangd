@@ -1,0 +1,12 @@
+CompileFlags:
+    Compiler: i386-elf-g++
+    Remove:
+        - -stdlib=*
+    Add:
+        - -nostdinc++
+        - -m32
+        - -ffreestanding
+        - -nostdlib
+        - -fno-exceptions
+        - -fno-rtti
+        - -Isrc/

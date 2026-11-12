@@ -1,5 +1,17 @@
-import os,datetime,math,subprocess,argparse,sys
+import os,datetime,math,subprocess,argparse,sys,struct
 
+def makeTemplates():
+    for i in os.listdir("templates"):
+        with open(f"templates/{i}","r") as f:
+            with open(f"src/{i}","w") as g:
+                lines = f.read().split("\n")
+                out = []
+                for i in lines:
+                    if i.startswith("/*$$"):
+                        i = i[4:]
+                        i = eval(i)
+                    out.append(i)
+                g.write("\n".join(out))
 """
 
 Copyright (C) 2026  XenithMusic (on github)
@@ -17,7 +29,12 @@ parser.add_argument("-k","--keepfs",action="store_true",default=False,
                     help="Prevents recreation of the filesystem.")
 parser.add_argument("-D","--debug",action="store_true",default=False,
                     help="Enables debugging mode. More verbose logging.")
+parser.add_argument("-q","--qemuflags",default="",
+                    help="Passes extra flags to QEMU.")
+parser.add_argument("-s","--skip",action="store_true",default=False,
+                    help="Skip compilation, only run.")
 args = parser.parse_args()
+QFLAGS = args.qemuflags
 
 COLOR_RED = "\033[31m"
 COLOR_RESET = "\033[0m"
@@ -25,11 +42,6 @@ COLOR_RESET = "\033[0m"
 def escape_shell_string(input_str):
     # Escape single quotes and double quotes by adding backslashes
     return input_str.replace('"', '\\"')
-
-os.system(f"make -Bs")
-
-with open("Makefile","r") as f:
-	data = f.read().split("\n")
 
 constants = {
 	"CONST_VERSION":"\"early-0.1.0\"",
@@ -43,7 +55,6 @@ if args.debug:
 # dynamic constants
 
 constants["CONST_COMPDATE"] = "\"" + datetime.datetime.now().strftime("%a. %B %d, %Y @ %I:%M %p") + "\""
-constants["CONST_KERNELSIZE"] = str(round((os.path.getsize("bin/paranoia.bin")*2)/512))
 
 # manipulate constants
 
@@ -54,23 +65,30 @@ constants = "CONST=\"" + escape_shell_string(constants) + "\""
 print("\n\n\nCONSTANTS:",constants,"\n\n\n")
 print()
 
-# make iso
-proc = subprocess.run(f"make -B {constants}",shell=True)
-if proc.returncode != 0:
-    print(f"""
-{COLOR_RED}*************
-Build Failed!
-*************{COLOR_RESET}
-""")
-    exit(proc.returncode);
-# && qemu-img create -f qcow2 -b paranoia.iso -o backing_fmt=raw paranoia.img 512M && \
-# qemu-system-i386 -m 256M -s -drive file=paranoia.img,format=qcow2,media=disk -boot c")
+if not args.skip:
+    # make templates
+    makeTemplates()
 
-# make filesystem
-if not args.keepfs:
-    print("[build] Making filesystem...")
-    os.system("sudo ./build_filesystem")
+    # make iso
+    proc = subprocess.run(f"make -B {constants}",shell=True)
+    if proc.returncode != 0:
+        print(f"""
+    {COLOR_RED}*************
+    Build Failed!
+    *************{COLOR_RESET}
+    """)
+        exit(proc.returncode);
+    # && qemu-img create -f qcow2 -b paranoia.iso -o backing_fmt=raw paranoia.img 512M && \
+    # qemu-system-i386 -m 256M -s -drive file=paranoia.img,format=qcow2,media=disk -boot c")
+
+    with open("./filesystem/sys/state/compiled/kernelsize","wb") as f:
+        f.write(struct.pack("d",float(os.path.getsize("bin/paranoia.bin"))))
+
+    # make filesystem
+    if not args.keepfs:
+        print("[build] Making filesystem...")
+        os.system("sudo ./build_filesystem")
 
 # run
 print("[build] Running!")
-os.system("qemu-system-i386 -m 256M -s -drive file=filesystem.img,format=raw,media=disk -boot c")
+os.system(f"qemu-system-i386 -m 256M -s {QFLAGS} -drive file=filesystem.img,format=raw,media=disk -boot c")

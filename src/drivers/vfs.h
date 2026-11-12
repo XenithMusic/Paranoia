@@ -22,4 +22,6 @@ namespace VFS {
     fid_t openFile(File file);
     void closeFile(fid_t fid);
     void readFile(fid_t fid, size_t startAddress, size_t bytes, void* buffer);
+    uint64_t getFileSize(fid_t fid);
+    // uint64_t getDiskAllocationSize(fid_t fid);
 }

@@ -5,6 +5,10 @@
 *.log
 *.o
 *.code-workspace
+*.lex
+*.elf
+*.exe
+*.x86_64
 .vscode/
 .bochsrc
 bochsout.txt

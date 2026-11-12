@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License along with Par
     .extern basic_eoi_handler_low
     .globl basic_eoi_assembly_high
     .extern basic_eoi_handler_high
+    .globl syscall_assembly
+    .extern syscall_handler
 
 basic_eoi_assembly_low:
     push %ds
@@ -49,6 +51,18 @@ irq1_assembly:
     push $0
     push $33 # 0x21
     call irq1_handler
+    add $8, %esp
+    popal
+    pop %ds
+    iret
+syscall_assembly:
+    push %ds
+    pushal
+    mov $0x10, %ax
+    mov %ax, %ds
+    push $0
+    push $33 # 0x21
+    call syscall_handler
     add $8, %esp
     popal
     pop %ds

@@ -118,12 +118,13 @@ namespace VFS {
         while(1){}
         return -1;
     }
-    char* getTargetPath(char* path) {
+    const char* getTargetPath(const char* path) {
+        // HACK: is this supposed to just return `path`? what is this even used for??
         int i = 1;
         while (path[i] != '/') {
             i++;
         }
-        return path;
+        return path + i;
     }
     File getFileFromPath(char* path) {
         Terminal::printdebug("splitting path\n");
@@ -131,7 +132,6 @@ namespace VFS {
         fsid_t fs = getAssociatedFilesystem(split);
         if (fs == -1) fault(10000,"fs == -1");
         Terminal::printdebug("getting target path\n");
-        char* targetPath = getTargetPath(path);
         Terminal::printdebug("constructing file object\n");
         File constructed;
         constructed.filesystem = fs;
@@ -203,28 +203,28 @@ namespace VFS {
         }
         return size;
     }
-    uint64_t getDiskAllocationSize(fid_t fid) {
-        OpenFile* file = openedfiles[fid];
-        Filesystem* fsentry = (filesystems)[file->file.filesystem];
-        uint64_t size = getFileSize(fid);
-        uint64_t realsize = size;
-        if (fsentry->type == ext2) {
-            size_t blockSize = 1024<<fsentry->fs->fs.ext2->superblock->block_size;
-            realsize += ((size+blockSize-1)/blockSize)/8;
-            // the above is BGDT block bitmap contribution. this may seem a little odd, since this is a 
-            // filesystem-wide concept, however this is always true, as this will add no blocks for 0-byte files, matching
-            // function behavior, and add one block (one bit) for 1-byte files, which would match the growth of the 
-            // inode bitmap table; the inode bitmap table is incredibly unlikely to force an expansion of the BGDT,
-            // thus this addition holds true.
-            //
-            // if this is not odd, my bad, i told an AI how i was doing this (i wrote the code) and it more or
-            // less asked me "why the fuck" and said this was bullshit.
+    // uint64_t getDiskAllocationSize(fid_t fid) {
+    //     OpenFile* file = openedfiles[fid];
+    //     Filesystem* fsentry = (filesystems)[file->file.filesystem];
+    //     uint64_t size = getFileSize(fid);
+    //     uint64_t realsize = size;
+    //     if (fsentry->type == ext2) {
+    //         size_t blockSize = 1024<<fsentry->fs->fs.ext2->superblock->block_size;
+    //         realsize += ((size+blockSize-1)/blockSize)/8;
+    //         // the above is BGDT block bitmap contribution. this may seem a little odd, since this is a 
+    //         // filesystem-wide concept, however this is always true, as this will add no blocks for 0-byte files, matching
+    //         // function behavior, and add one block (one bit) for 1-byte files, which would match the growth of the 
+    //         // inode bitmap table; the inode bitmap table is incredibly unlikely to force an expansion of the BGDT,
+    //         // thus this addition holds true.
+    //         //
+    //         // if this is not odd, my bad, i told an AI how i was doing this (i wrote the code) and it more or
+    //         // less asked me "why the fuck" and said this was bullshit.
 
-            realsize += fsentry->fs->fs.ext2->superblock->inode_size; // size of the inode entry.
-        }
-        if (realsize < size) {
-            realsize = size; // WOW, THAT'S A BIG ASS FILE. 9 EXABYTES?? ARE YOU ON LIKE ZFS OR SOME SHIT???
-        }
-        return realsize;
-    }
+    //         realsize += fsentry->fs->fs.ext2->superblock->inode_size; // size of the inode entry.
+    //     }
+    //     if (realsize < size) {
+    //         realsize = size; // WOW, THAT'S A BIG ASS FILE. 9 EXABYTES?? ARE YOU ON LIKE ZFS OR SOME SHIT???
+    //     }
+    //     return realsize;
+    // }
 }

@@ -36,7 +36,7 @@ namespace IDT {
 		// doing this manually lol
 		uint8_t PIC1_IRQ_MASK = 0xFF;
 		// PIC1_IRQ_MASK &= ~(1 << 0); // unmask IRQ0
-		// PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
+		PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
 		uint8_t PIC2_IRQ_MASK = 0xFF;
 		pic::remapPIC(PIC1_IRQ_MASK,PIC2_IRQ_MASK);
 	}

@@ -95,4 +95,4 @@ if not args.skip:
 
 # run
 print("[build] Running!")
-os.system(f"qemu-system-x86_64 -m 256M -s {QFLAGS} -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd -drive file=filesystem.img,format=raw,media=disk -boot c")
+os.system(f"qemu-system-x86_64 -m 256M -s {QFLAGS} -drive file=filesystem.img,format=raw,media=disk -boot c")

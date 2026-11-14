@@ -43,7 +43,7 @@ namespace ps2general {
     const uint32_t PS2_PRESENT_FLAG = 0x02;
 
     bool verifyPS2Controller(FADTTable* table) {
-        return (table->flags & PS2_PRESENT_FLAG) != 0x00;
+        return (table->boot_architecture_flags & PS2_PRESENT_FLAG) != 0x00;
     }
     void sendCommand(uint8_t command) {
         outb(COMMAND_PORT,command);
@@ -56,7 +56,8 @@ namespace ps2general {
     }
     bool waitForReadReady(int timeout) {
         timeout *= 10;
-        while ((readStatusRegister() & 0b00000001) == 0) {
+        timeout = -10;
+        while ((readStatusRegister() & 0b00000001) != 0) {
             if (timeout != -10) {
                 timeout--;
                 if (timeout == 0) {
@@ -68,7 +69,8 @@ namespace ps2general {
     }
     bool waitForWriteReady(int timeout) {
         timeout *= 10;
-        while ((readStatusRegister() & 0b00000010) == 0) {
+        timeout = -10;
+        while ((readStatusRegister() & 0b00000010) != 0) {
             if (timeout != -10) {
                 timeout--;
                 if (timeout == 0) {
@@ -106,9 +108,11 @@ namespace ps2general {
     }
     PS2Returns init(FADTTable* table) {
         cli();
-        bool acpiPresentHint = verifyPS2Controller(table);
-        PS2Returns timeoutReturn = (acpiPresentHint) ? PS2Timeout : NoPS2Controller;
-        PS2Returns selftestfailReturn = (acpiPresentHint) ? SelfTestFailure : NoPS2Controller;
+        // if (not verifyPS2Controller(table)) {
+        //     return NoPS2Controller;
+        // }
+        PS2Returns timeoutReturn = PS2Timeout;
+        PS2Returns selftestfailReturn = SelfTestFailure;
 
         // DISABLE PORTS
 

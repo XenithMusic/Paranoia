@@ -29,9 +29,11 @@ namespace VFS {
             fs = ext2::mount(driveType,driveIndex,partitionIndex);
             if (fs == nullptr) {
                 ext2::unmount(fs);
+                Terminal::printdebug("fs is not ext2\n");
                 return -1;
             }
         } else {
+            Terminal::printdebug("fs is not supported\n");
             return -1;
         }
         constructed->type = fsType;
@@ -183,7 +185,9 @@ namespace VFS {
         if (fsentry->type == ext2) {
             ext2::close_inode(file->data.ext2);
         }
+        Terminal::printdebug("FREEING\n");
         Allocator::free(file);
+        Terminal::printdebug("FREED\n");
         openedfiles[fid] = nullptr;
     }
     void readFile(fid_t fid, size_t startAddress, size_t bytes, void* buffer) {

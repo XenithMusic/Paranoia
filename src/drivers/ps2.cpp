@@ -445,12 +445,18 @@ namespace ps2keyboard {
     }
 
     PS2Returns disableScanning() {
+        Terminal::printdebug("ds1");
         oldState = state.state;
         state.state = WaitingForAck;
+        Terminal::printdebug("ds2");
         codeStore = waitReady(1000);
+        Terminal::printdebug("ds3");
         if (codeStore != Success) return codeStore;
+        Terminal::printdebug("ds4");
         ps2general::sendData(DISABLE_SCANNING);
+        Terminal::printdebug("ds5");
         codeStore = waitAck(1000);
+        Terminal::printdebug("ds6");
         if (codeStore != Success) return codeStore;
         Terminal::printdebug("DSSCAN SUCCESS\n");
         state.state = oldState;
@@ -538,10 +544,13 @@ namespace ps2keyboard {
         state.lastScancode = 0;
         state.firstScancode = 0;
         state.ready = true;
+        Terminal::printdebug("zzz");
         sti();
+        Terminal::printdebug("aaa");
         codeStore = changeScancodeSet(1);
-        Terminal::printdebug("\n\n\nAAA\n\n\n");
+        Terminal::printdebug("bbb");
         state.state = WaitingForScancodes;
+        Terminal::printdebug("ccc");
         return codeStore;
     }
 

@@ -260,7 +260,6 @@ namespace ext2 {
             Terminal::print("manually indexing the bgdt by 62 yields ");
                 Terminal::print(parseInt((size_t)(fs->fs.ext2->bgdt + (62)),10));
                 Terminal::print("\n");
-            while(1){}
         }
         size_t inodeGroupIndex = address%groupInodes;
         size_t block_offset = (inodeGroupIndex) * fs->fs.ext2->superblock->inode_size / blockSize;

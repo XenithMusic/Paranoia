@@ -229,8 +229,6 @@ extern "C" {
                 Terminal::print("MiB\n");
         }
 
-        // hang here.
-
         // START OF FS TESTING STUFF !!!
 
         // Terminal::print("mounting\n");

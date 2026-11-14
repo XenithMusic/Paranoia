@@ -151,7 +151,6 @@ namespace IDT {
         fn(index,frame,errorCode);
     }
     void dispatch(int index, InterruptFrame* frame, uint32_t errorCode) {
-        Serial::print("<int>\n");
         if (deferred[index]) {
             queue.write({index,frame,errorCode});
             return;

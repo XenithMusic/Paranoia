@@ -29,8 +29,8 @@ namespace Paging {
         return (void*)aligned;
     }
 
-    void invalidatePage(uint32_t phys) {
-        asm volatile("invlpg (%0)" : : "r"(phys) : "memory");
+    void invalidatePage(uint32_t virt) {
+        asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
     }
 
     void mapArbitraryPage(PageDirectory* pd, uint32_t virt, uint32_t phys, uint32_t flags) {

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "types.h"
 #include "utils.h"
 #include "fail.h"
 #include "string.h"
@@ -105,9 +106,9 @@ namespace ps2general {
     }
     PS2Returns init(FADTTable* table) {
         cli();
-        if (not verifyPS2Controller(table)) {
-            return NoPS2Controller;
-        }
+        bool acpiPresentHint = verifyPS2Controller(table);
+        PS2Returns timeoutReturn = (acpiPresentHint) ? PS2Timeout : NoPS2Controller;
+        PS2Returns selftestfailReturn = (acpiPresentHint) ? SelfTestFailure : NoPS2Controller;
 
         // DISABLE PORTS
 
@@ -124,25 +125,30 @@ namespace ps2general {
         uint8_t config = fetchConfigurationByte();
 
         if (config == TIMEOUT_PSEUDO) {
-            return PS2Timeout;
+            return timeoutReturn;
         }
 
-        config &= 0b11111111; // clear bit ~~6~~ (bit 6 enables translating set 2 to set 1.)
-        config |= 0b01000000; // set bit 0 and 6
+        config &= 0b10111111; // clear bit ~~6~~ (bit 6 enables translating set 2 to set 1.)
+        config |= 0b00000000; // set bit 0 and 6
 
         sendCommand16(WRITE_CONFIG_BYTE,config);
 
         // SELF TEST
-
-        while (inb(0x64) & 2) {}
+        size_t count = 0;
+        while (inb(0x64) & 2) {
+            count++;
+            if (count > 10000) {
+                return timeoutReturn;
+            }
+        }
 
         sendCommand(SELF_TEST);
         if (not waitForReadReady(10000)) {
-            return PS2Timeout;
+            return timeoutReturn;
         }
         uint8_t result = inb(DATA_PORT);
         if (result != 0x55) {
-            return SelfTestFailure;
+            return selftestfailReturn;
         }
 
         sendCommand16(WRITE_CONFIG_BYTE,config); // fix the configuration because sometimes selftest resets the config
@@ -242,7 +248,7 @@ namespace ps2general {
 
 namespace ps2keyboard {
 
-    char* str = "testingonetwothree";
+    char str[128] = "testingonetwothree\0";
     const uint8_t ENABLE_SCANNING = 0xF4;
     const uint8_t DISABLE_SCANNING = 0xF5;
     const uint8_t SELECT_SCANCODE = 0xF0;
@@ -539,8 +545,7 @@ namespace ps2keyboard {
         state.firstScancode = 0;
         state.ready = true;
         sti();
-        codeStore = changeScancodeSet(2);
-        codeStore = changeScancodeSet(2);
+        codeStore = changeScancodeSet(1);
         Terminal::printdebug("\n\n\nAAA\n\n\n");
         state.state = WaitingForScancodes;
         return codeStore;

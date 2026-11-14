@@ -72,11 +72,15 @@ namespace LEXLoader {
         process->ticksSinceRun = 0;
         {
             kmemset(&process->ctx,0,sizeof(scheduler::ProcessContext));
-            process->ctx.esp = (uint32_t)process->memoryBase+STACK_SIZE;
+            process->ctx.esp = (uint32_t)header->expectedBase+STACK_SIZE;
             process->ctx.eip = (uint32_t)process->entrypoint;
             process->ctx.eflags = 0x202;
             process->ctx.cs = 0x18+3;
             process->ctx.ss = 0x20+3;
+            process->ctx.ds = 0x23;
+            process->ctx.es = 0x23;
+            process->ctx.fs = 0x23;
+            process->ctx.gs = 0x23;
         }
 
         Allocator::free(header);

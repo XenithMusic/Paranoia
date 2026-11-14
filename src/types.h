@@ -68,32 +68,63 @@ typedef struct {
     uint32_t mmap_addr;
 } multiboot_info;
 
-struct Framebuffer {
-    uint32_t framebuffer_addr;     // physical address of framebuffer
-    uint32_t framebuffer_pitch;    // bytes per scanline
-    uint32_t framebuffer_width;
-    uint32_t framebuffer_height;
-    uint8_t  framebuffer_bpp;      // bits per pixel
-    uint8_t  framebuffer_type;     // 0=Indexed, 1=RGB, 2=EGA Text
-} __attribute__((packed));
-
-// directly from chatgpt for testing to see if this is actually correct
 struct multiboot_info_t {
     uint32_t flags;        // bitfield
+
     uint32_t mem_lower;
     uint32_t mem_upper;
+
     uint32_t boot_device;
+
     uint32_t cmdline;
+
     uint32_t mods_count;
     uint32_t mods_addr;
+
     uint32_t syms[4];
+
     uint32_t mmap_length;
     uint32_t mmap_addr;
 
-    // --- framebuffer info ---
-    Framebuffer framebuffer;
-    uint8_t  reserved[2];          // padding
-};
+    uint32_t drives_length;
+    uint32_t drives_addr;
+
+    uint32_t config_table;
+
+    uint32_t boot_loader_name;
+
+    uint32_t apm_table;
+
+    uint32_t vbe_control_info;
+    uint32_t vbe_mode_info;
+    uint16_t vbe_mode;
+    uint16_t vbe_interface_seg;
+    uint16_t vbe_interface_off;
+    uint16_t vbe_interface_len;
+
+    uint64_t framebuffer_addr;
+    uint32_t framebuffer_pitch;
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    uint8_t framebuffer_bpp;
+    uint8_t framebuffer_type;
+    
+    union {
+        struct {
+            uint32_t framebuffer_palette_addr;
+            uint16_t framebuffer_palette_num_colors;
+        };
+
+        struct {
+            uint8_t framebuffer_red_field_position;
+            uint8_t framebuffer_red_mask_size;
+            uint8_t framebuffer_green_field_position;
+            uint8_t framebuffer_green_mask_size;
+            uint8_t framebuffer_blue_field_position;
+            uint8_t framebuffer_blue_mask_size;
+        };
+    };
+} __attribute__((packed));
 
 enum MBlockState : char {
     USED = 0,
@@ -156,13 +187,14 @@ struct PageDirectory {
 
 namespace scheduler {
     struct ProcessContext {
-        uint32_t eax, ebx, ecx, edx = 0;
-        uint32_t esi, edi = 0;
-        uint32_t ebp, esp = 0;
-
-        uint32_t eip, eflags = 0;
-
-        uint32_t cs,ds,ss = 0;
+        // iret frame
+        uint32_t eip,cs,eflags,esp,ss = 0;
+        // segments
+        uint32_t gs,fs,es,ds = 0;
+        // popal
+        uint32_t di,si,bp = 0;
+        uint32_t reserved = 0;
+        uint32_t bx,dx,cx,ax = 0;
     };
     struct Process {
         pid_t parentPid;

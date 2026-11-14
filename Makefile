@@ -17,14 +17,13 @@ CFLAGS += $(CONST)
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isrs.o syscall.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_video.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
+OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o serial.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isrs.o syscall.o driver_framebuf.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
 
 # The default target
 all: $(ISO_IMAGE)
-
 
 boot.o: src/boot.s
 	$(AS) $< -o $@
@@ -36,6 +35,9 @@ isras.o: src/isr.s
 	$(AS) $< -o $@
 
 # Compile the C code (with inline assembly)
+serial.o: src/serial.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 paranoia.o: src/paranoia.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -109,6 +111,9 @@ driver_vfs.o: src/drivers/vfs.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 driver_lex.o: src/drivers/lex.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+driver_framebuf.o: src/drivers/framebuf.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 scheduler.o: src/scheduler.cpp

@@ -4,6 +4,7 @@
 #include "types.h"
 #include "const.h"
 #include "utils.h"
+#include "serial.h"
 
 /*
 
@@ -40,7 +41,6 @@ namespace Terminal {
     uint8_t color;
     uint8_t cursorConfig = 0xEF;
     uint16_t* buffer;
-    uint16_t* clearBuffer;
     uint16_t* temp;
 
     uint8_t getTerminalColor() { return color; }
@@ -103,21 +103,16 @@ namespace Terminal {
 
     void swapBuffers(void)
     {
-        uint16_t* temp = buffer;
-        buffer = clearBuffer;
-        clearBuffer = temp;
     }
 
     void clearScreen(void)
     {
-        swapBuffers();
         for (size_t y = 0; y < VGA_HEIGHT; y++) {
             for (size_t x = 0; x < VGA_WIDTH; x++) {
                 const size_t index = y * VGA_WIDTH + x;
-                clearBuffer[index] = vga_entry(' ', color);
+                buffer[index] = vga_entry(' ', color);
             }
         }
-        swapBuffers();
     }
 
     void GPL();
@@ -128,7 +123,6 @@ namespace Terminal {
         col = 0;
         color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
         buffer = (uint16_t*) 0xB8000;
-        clearBuffer = (uint16_t*) 0xC0000;
         clearScreen();
         GPL();
     }
@@ -166,8 +160,7 @@ namespace Terminal {
     void write(const char* c,size_t size,bool moveCursor) {
         for (size_t i = 0; i < size; i++) {
             putChar(c[i],moveCursor);
-            if (c[i] == '\n') {
-            }
+            Serial::write(c[i]);
         }
     }
     void print(const char* str,bool moveCursor) {

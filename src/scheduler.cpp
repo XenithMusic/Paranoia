@@ -2,6 +2,7 @@
 #include "memory.h"
 #include "vector.h"
 #include "paranoia.h"
+#include "utils.h"
 
 #define QUANTUM_LENGTH 1000 // 1 millisecond :3
 
@@ -18,37 +19,17 @@ namespace scheduler {
     void setupTimer(size_t quantumMicroseconds) {
 
     }
-    void enterProcess(Process* process) {
-        Terminal::print(parseInt(process->ctx.ss,16));
-        __asm__ volatile(
-            "mov %0, %%eax \n"
-            "mov %1, %%ebx \n"
-            "mov %2, %%ecx \n"
-            "mov %3, %%edx \n"
-            "mov %4, %%esi \n"
-            "mov %5, %%edi \n"
-            "mov %6, %%ebp \n"
-            
-            "pushl %7 \n"
-            "pushl %8 \n"
-            "pushl %9 \n"
-            "pushl %10 \n"
-            "pushl %11 \n"
-            "iret \n"
-            :: "m"(process->ctx.eax),
-               "m"(process->ctx.ebx),
-               "m"(process->ctx.ecx),
-               "m"(process->ctx.edx),
-               "m"(process->ctx.esi),
-               "m"(process->ctx.edi),
-               "m"(process->ctx.ebp),
-
-               "m"(process->ctx.ss),
-               "m"(process->ctx.esp),
-               "m"(process->ctx.eflags),
-               "m"(process->ctx.cs),
-               "m"(process->ctx.eip)
-               : "eax","ebx","ecx","edx","esi"
+    __attribute__((noreturn))
+    void enterProcess(volatile Process* process) {
+        __asm__ __volatile__(
+            "movl %0, %%esp\n"
+            "popal\n"
+            "pop %%ds\n"
+            "pop %%es\n"
+            "pop %%fs\n"
+            "pop %%gs\n"
+            "iret\n"
+            "hlt" : : "r"(&process->ctx.ax) : "memory"
         );
         while(1){}
     }

@@ -1,7 +1,8 @@
 #include "terminal.h"
 #include "string.h"
-#include "pit.h"
+#include "serial.h"
 #include "utils.h"
+#include "pit.h"
 
 #define COM1 0x3F8
 
@@ -61,7 +62,7 @@ void clearError() {
 }
 
 void fault(int errno,const char* string,const char* source) {
-	outstr(COM1,"FAULT");
+	Serial::print("fault!\n");
 	cli(); // prevent interrupts causing unexpected fault exiting
 	char* str;
 	Terminal::init();
@@ -207,6 +208,9 @@ void fault(int errno,const char* string,const char* source) {
 
 		Terminal::print("  This is guaranteed to be a bug. Please report this.\n");
 	}
+	if (errno == -702) {
+		Terminal::print("  Page fault.\n");
+	}
 	if (errno == -800) {
 		Terminal::print("  Faulting Disk drive has errors.\n\n");
 
@@ -226,6 +230,11 @@ void fault(int errno,const char* string,const char* source) {
 		Terminal::print("  The Multiboot header is incorrect.\n\n");
 
 		Terminal::print("  Refer to extra for details.\n");
+	}
+	if (errno == -1100) {
+		Terminal::print("  General Protection Fault\n\n");
+
+		Terminal::print("  Refer to extra for errorCode.\n");
 	}
 	setError(1000);
 }

@@ -14,12 +14,12 @@ https://wiki.osdev.org/OSDev_Wiki:General_disclaimer
 .set MEMINFO,  1<<1             /* provide memory map */
 .set VIDEO,    1<<2             /* request framebuffer */
 
-.set FLAGS,    ALIGN | MEMINFO  /* this is the Multiboot 'flag' field */
+.set FLAGS,    ALIGN | MEMINFO | VIDEO  /* this is the Multiboot 'flag' field */
 .set MAGIC,    0x1BADB002       /* 'magic number' lets bootloader find the header */
 .set CHECKSUM, -(MAGIC + FLAGS) /* checksum of above, to prove we are multiboot */
 
-.set FB_WIDTH, 1024
-.set FB_HEIGHT,768
+.set FB_WIDTH, 640
+.set FB_HEIGHT, 480
 .set FB_BIT, 32
 .set MODE_TYPE, 0 /* mode_type = framebuffer */
 
@@ -117,6 +117,7 @@ _start:
     stack since (pushed 0 bytes so far), so the alignment has thus been
     preserved and the call is well defined.
     */
+    push %ebx // pass kernel_main the multiboot info pointer!
     call kernel_main
 
     /*

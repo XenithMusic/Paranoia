@@ -3,7 +3,9 @@
 #include "terminal.h"
 #include "syscall.h"
 #include "string.h"
+#include "serial.h"
 #include "memory.h"
+#include "vector.h"
 #include "const.h"
 #include "types.h"
 #include "fail.h"
@@ -17,11 +19,11 @@
 // DRIVERS
 
 #include "drivers/driverman.h"
+#include "drivers/framebuf.h"
 #include "drivers/ext2.h"
 #include "drivers/ata.h"
 #include "drivers/vfs.h"
 #include "drivers/lex.h"
-#include "vector.h"
 
 /*
 
@@ -53,9 +55,7 @@ TODO:
     [X] Put the addresses of the ISR handlers in the appropiate descriptors (in the IDT)
 
 - PS/2 Keyboard Driver
-    BUG: Changing scancode sets doesn't work
     TODO: Verify that the PS/2 Controller exists.
-    BUG: Doesn't work at all now???
 
 - Userspace
     BUG: Entirely broken.
@@ -65,6 +65,7 @@ extern "C" {
 
     char* str; // pointer if anything demands a pointer
     multiboot_info_t* g_mbi;
+    PageDirectory* g_pd;
     uint8_t* k_stack_top;
     uint8_t k_stack_new[65536];
     uint8_t u_stack_demo[8192];
@@ -86,13 +87,17 @@ extern "C" {
         GDTinitialized(mbi);
     }
     void GDTinitialized(multiboot_info_t* mbi) {
-        Paging::initwkp(); // Initialize Paging as the VERY SECOND THING YOU DO.
+        g_pd = Paging::initwkp(); // Initialize Paging as the VERY SECOND THING YOU DO.
         PagingInitialized(mbi);
     }
     void PagingInitialized(multiboot_info_t* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
 
         Allocator::init();
+
+        IDT::init();
+        IDT::addDefaults();
+        IDT::finish();
 
         void* phys_page = Paging::kalloc4K();
         if (phys_page == nullptr) {
@@ -101,13 +106,21 @@ extern "C" {
         if ((uintptr_t)phys_page&0xFFF) {
             fault(-103,"page isnt aligned","paranoia.PagingInitialized");
         }
-        Paging::mapArbitraryRange(&Paging::kernelPD,0x400000,(uint32_t)phys_page,80,0x7);
+        Paging::mapArbitraryRange(g_pd,0x400000,(uint32_t)phys_page,80,0x7);
         uint8_t* test = (uint8_t*)phys_page;
         test[0] = 0xAA;
         test[0xFFF] = 0x55;
         if (test[0] != 0xAA or test[0xFFF] != 0x55) {
             fault(-103,"page did not write","paranoia.PagingInitialized");
         }
+
+        Serial::init();
+
+        framebuf_t buffer = Framebuffer::init(mbi);
+        Paging::mapArbitraryRange(g_pd,0x30000000,(uint32_t)buffer.address,buffer.pitch*buffer.height,0x3);
+        // *(volatile uint32_t*)(0x30000000) = 0x00FFFFFF;
+        Framebuffer::vaddr(0x30000000);
+        Framebuffer::drawpx(10,10,0x00FFFFFF);
 
         // Backlog of pre-terminal init
         Terminal::init();
@@ -123,6 +136,15 @@ extern "C" {
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" Terminal initialized.");
             Terminal::print("\n");
+        Terminal::print("framebuffer bpp:");
+            Terminal::print(parseInt(mbi->framebuffer_bpp, 10));
+            Terminal::print(" type:");
+            Terminal::print(parseInt(mbi->framebuffer_type, 10));
+            Terminal::print(" flags:");
+            Terminal::print(parseInt(mbi->flags, 16));
+            Terminal::print(" addr:");
+            Terminal::print(parseU32(mbi->framebuffer_addr, 16));
+            Terminal::print(" !!!");
 
         // #warning "The RSDT is being replaced with NULL; VERY dangerous, and WILL result in unintended behavior."
         // #warning "If you see this while compiling, PLEASE REPORT THIS AS A BUG."
@@ -153,9 +175,6 @@ extern "C" {
             Terminal::print(")\n\n");
         
         // initIDT(idt);
-        IDT::init();
-        IDT::addDefaults();
-        IDT::finish();
 
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));

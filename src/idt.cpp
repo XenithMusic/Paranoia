@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "isrs.h"
 #include "types.h"
+#include "serial.h"
 #include "utils.h"
 #include "pic.h"
 #include "circqueue.h"
@@ -35,7 +36,7 @@ namespace IDT {
 		// doing this manually lol
 		uint8_t PIC1_IRQ_MASK = 0xFF;
 		// PIC1_IRQ_MASK &= ~(1 << 0); // unmask IRQ0
-		PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
+		// PIC1_IRQ_MASK &= ~(1 << 1); // unmask IRQ1
 		uint8_t PIC2_IRQ_MASK = 0xFF;
 		pic::remapPIC(PIC1_IRQ_MASK,PIC2_IRQ_MASK);
 	}
@@ -47,7 +48,15 @@ namespace IDT {
         entries = (IDTEntry*)Allocator::kalloc(IDT_ENTRIES_SIZE);
     }
     void genericFaultHandler(int index,InterruptFrame* frame, uint32_t errorCode) {
-        fault(1,"Refer to the `source` text for the error code.",parseInt(index, 10));
+        fault(1,"Refer to the `source` text for the exception index.",parseInt(index, 10));
+    }
+    void generalProtection(int index,InterruptFrame* frame, uint32_t errorCode) {
+        fault(-1100,parseU32(frame->cs, 16));
+    }
+    void pageFault(int index,InterruptFrame* frame, uint32_t errorCode) {
+        uint32_t cr2 = 0;
+        __asm__ volatile ("mov %%cr2, %0" : "=r"(cr2));
+        fault(-702,parseU32(errorCode, 16),parseU32(cr2,16));
     }
     void harshFaultHandler(int index,InterruptFrame* frame, uint32_t errorCode) {
         warn("Critical fault! (index ");
@@ -56,6 +65,8 @@ namespace IDT {
         induceHalt();
     }
     void breakpointHandler(int index,InterruptFrame* frame, uint32_t errorCode) {
+        cli();
+        Serial::print("breakpoint handler");
         __asm__ __volatile__("hlt"); // stop the state as soon as possible to preserve it
     }
     void irq1Handler(int index,InterruptFrame* frame, uint32_t errorCode) {
@@ -95,12 +106,12 @@ namespace IDT {
         add(5,(void*)&genericFaultHandler);
         add(6,(void*)&genericFaultHandler);
         add(7,(void*)&genericFaultHandler);
-        add(8,(void*)&genericFaultHandler);
+        add(8,(void*)&breakpointHandler);
         add(10,(void*)&genericFaultHandler);
         add(11,(void*)&genericFaultHandler);
         add(12,(void*)&genericFaultHandler);
-        add(13,(void*)&genericFaultHandler);
-        add(14,(void*)&genericFaultHandler);
+        add(13,(void*)&generalProtection);
+        add(14,(void*)&pageFault);
         add(16,(void*)&genericFaultHandler);
         add(17,(void*)&genericFaultHandler);
         add(18,(void*)&harshFaultHandler);
@@ -140,6 +151,7 @@ namespace IDT {
         fn(index,frame,errorCode);
     }
     void dispatch(int index, InterruptFrame* frame, uint32_t errorCode) {
+        Serial::print("<int>\n");
         if (deferred[index]) {
             queue.write({index,frame,errorCode});
             return;

@@ -1,5 +1,13 @@
 import os,datetime,math,subprocess,argparse,sys,struct
 
+def fail(ret):
+    print(f"""
+{COLOR_RED}*************
+Build Failed!
+*************{COLOR_RESET}
+""")
+    exit(ret);
+
 def makeTemplates():
     for i in os.listdir("templates"):
         with open(f"templates/{i}","r") as f:
@@ -71,12 +79,7 @@ if not args.skip:
     # make iso
     proc = subprocess.run(f"make -B {constants}",shell=True)
     if proc.returncode != 0:
-        print(f"""
-    {COLOR_RED}*************
-    Build Failed!
-    *************{COLOR_RESET}
-    """)
-        exit(proc.returncode);
+        fail(proc.returncode)
     # && qemu-img create -f qcow2 -b paranoia.iso -o backing_fmt=raw paranoia.img 512M && \
     # qemu-system-i386 -m 256M -s -drive file=paranoia.img,format=qcow2,media=disk -boot c")
 
@@ -86,8 +89,10 @@ if not args.skip:
     # make filesystem
     if not args.keepfs:
         print("[build] Making filesystem...")
-        os.system("sudo ./build_filesystem")
+        proc = subprocess.run("sudo ./build_filesystem",shell=True)
+        if proc.returncode != 0:
+            fail(proc.returncode)
 
 # run
 print("[build] Running!")
-os.system(f"qemu-system-i386 -m 256M -s {QFLAGS} -drive file=filesystem.img,format=raw,media=disk -boot c")
+os.system(f"qemu-system-x86_64 -m 256M -s {QFLAGS} -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd -drive file=filesystem.img,format=raw,media=disk -boot c")

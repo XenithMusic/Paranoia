@@ -41,8 +41,17 @@ parser.add_argument("-q","--qemuflags",default="",
                     help="Passes extra flags to QEMU.")
 parser.add_argument("-s","--skip",action="store_true",default=False,
                     help="Skip compilation, only run.")
+parser.add_argument("-u","--uefi",action="store_true",default=False,
+                    help="(experimental) Make a UEFI system instead of a BIOS system.")
 args = parser.parse_args()
 QFLAGS = args.qemuflags
+QEMUPLATFORM = "i386"
+BIOSMODE = "bios"
+if args.uefi:
+    QFLAGS += " -bios /usr/share/edk2-ovmf/x64/OVMF.4m.fd"
+    QEMUPLATFORM = "x86_64"
+    BIOSMODE = "uefi"
+
 
 COLOR_RED = "\033[31m"
 COLOR_RESET = "\033[0m"
@@ -89,10 +98,10 @@ if not args.skip:
     # make filesystem
     if not args.keepfs:
         print("[build] Making filesystem...")
-        proc = subprocess.run("sudo ./build_filesystem",shell=True)
+        proc = subprocess.run(f"sudo ./build_filesystem {BIOSMODE}",shell=True)
         if proc.returncode != 0:
             fail(proc.returncode)
 
 # run
 print("[build] Running!")
-os.system(f"qemu-system-i386 -m 256M -s {QFLAGS} -drive file=filesystem.img,format=raw,media=disk -boot c")
+os.system(f"qemu-system-{QEMUPLATFORM} -m 256M -s {QFLAGS} -drive file=filesystem.img,format=raw,media=disk -boot c")

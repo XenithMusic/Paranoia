@@ -2,56 +2,105 @@
 
 # guarantee all of my loopbacks are unmounted (these will likely fail)
 sudo umount ./fsconst/primary
+sudo umount ./fsconst/esp
 sudo losetup -D
 
+cleanup() {
+    echo "[build_filesystem_v2] Cleaning."
+    sync
+    if [[ "$MODE" == "uefi" ]]; then
+        sudo umount ./fsconst/esp 2>/dev/null || true # UEFI
+    fi
+    sudo umount ./fsconst/primary 2>/dev/null || true
+    sudo losetup -d /dev/loop0 2>/dev/null || true
+
+    echo "[build_filesystem_v2] Cleaned up!"
+}
+trap cleanup EXIT
+
 set -e
+
+# arg
+MODE="$1" # expected to be `bios` or `uefi`
+if [[ "$MODE" == "bios" ]]; then
+    echo "[build_filesystem_v2] BIOS mode selected."
+elif [[ "$MODE" == "uefi" ]]; then
+    echo "[build_filesystem_v2] UEFI mode selected."
+else
+    echo "Usage: $0 [bios|uefi]"
+    echo "    (case sensitive)"
+    exit 1
+fi
 
 # create disk
 echo "[build_filesystem_v2] Creating image."
 dd if=/dev/zero of=filesystem.img bs=1M count=256 conv=sparse
-parted filesystem.img mklabel msdos # mbr table
-# parted filesystem.img mklabel gpt # gpt table
+if [[ "$MODE" == "bios" ]]; then
+    parted filesystem.img mklabel msdos # mbr table
+else
+    parted filesystem.img mklabel gpt # gpt table # UEFI
+fi
 
-parted filesystem.img mkpart primary ext2 1MiB 100%
-parted filesystem.img set 1 boot on
-
-# parted filesystem.img mkpart ESP fat32 1MiB 65MiB
-# parted filesystem.img set 1 esp on
-# parted filesystem.img mkpart primary ext2 65MiB 100%
+if [[ "$MODE" == "bios" ]]; then
+    parted filesystem.img mkpart primary ext2 1MiB 100% # BIOS
+    parted filesystem.img set 1 boot on # BIOS
+else
+    parted filesystem.img mkpart ESP fat32 1MiB 65MiB # UEFI
+    parted filesystem.img set 1 esp on # UEFI
+    parted filesystem.img mkpart primary ext2 65MiB 100% # UEFI
+fi
 
 mkdir -p ./fsconst/primary
-# mkdir -p ./fsconst/esp
+if [[ "$MODE" == "uefi" ]]; then
+    mkdir -p ./fsconst/esp # UEFI
+fi
 
 sudo losetup -Pf filesystem.img
 
 # format
 echo "[build_filesystem_v2] Formatting image."
-# sudo mkfs.fat -F 32 /dev/loop0p1
-sudo mkfs.ext2 -I 128 -O ^has_journal,^ext_attr,^resize_inode,^dir_index,^filetype,^sparse_super /dev/loop0p1
-sudo tune2fs -e panic /dev/loop0p1 # set errorhandling method to panic (0x3)
-sudo tune2fs -L "primary" /dev/loop0p1
-sudo tune2fs -c 5 /dev/loop0p1
-sudo tune2fs -C -1 /dev/loop0p1
+if [[ "$MODE" == "uefi" ]]; then
+sudo mkfs.fat -F 32 /dev/loop0p1 # UEFI
+fi
+
+# BIOS
+if [[ "$MODE" == "bios" ]]; then
+    sudo mkfs.ext2 -I 128 -O ^has_journal,^ext_attr,^resize_inode,^dir_index,^filetype,^sparse_super /dev/loop0p1
+    sudo tune2fs -e panic /dev/loop0p1 # set errorhandling method to panic (0x3)
+    sudo tune2fs -L "primary" /dev/loop0p1
+    sudo tune2fs -c 5 /dev/loop0p1
+    sudo tune2fs -C -1 /dev/loop0p1
+else
+# UEFI
+    sudo mkfs.ext2 -I 128 -O ^has_journal,^ext_attr,^resize_inode,^dir_index,^filetype,^sparse_super /dev/loop0p2
+    sudo tune2fs -e panic /dev/loop0p2 # set errorhandling method to panic (0x3)
+    sudo tune2fs -L "primary" /dev/loop0p2
+    sudo tune2fs -c 5 /dev/loop0p2
+    sudo tune2fs -C -1 /dev/loop0p2
+fi
+
 
 # build filesystem
 echo "[build_filesystem_v2] Building filesystem."
-# sudo mount /dev/loop0p1 ./fsconst/esp
-sudo mount /dev/loop0p1 ./fsconst/primary
+if [[ "$MODE" == "bios" ]]; then
+    sudo mount /dev/loop0p1 ./fsconst/primary # BIOS
+else
+    sudo mount /dev/loop0p1 ./fsconst/esp # UEFI
+    sudo mount /dev/loop0p2 ./fsconst/primary # UEFI
+fi
 sudo cp -r ./iso/* ./fsconst/primary
 sudo cp -r ./filesystem/* ./fsconst/primary
 
 # install grub
 echo "[build_filesystem_v2] Installing grub."
-sudo grub-install --target=i386-pc --boot-directory=./fsconst/primary/boot /dev/loop0
+if [[ "$MODE" == "bios" ]]; then
+    sudo grub-install --target=i386-pc --boot-directory=./fsconst/primary/boot /dev/loop0 # BIOS
+else
+    sudo grub-install --target=x86_64-efi --boot-directory=./fsconst/primary/boot --efi-directory=./fsconst/esp --removable --no-nvram # UEFI
+fi
 
-# unmount
-echo "[build_filesystem_v2] Done! Cleaning."
-sync
-# sudo umount ./fsconst/esp
-sudo umount ./fsconst/primary
-sudo losetup -d /dev/loop0
-
-echo "[build_filesystem_v2] Cleaned up!"
+# clean
+echo "[build_filesystem_v2] Done!"
 
 # create
 

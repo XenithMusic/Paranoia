@@ -33,36 +33,36 @@ namespace drivermanager {
         Terminal::print("[drivermanager::init @ ");
             Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
             Terminal::print("] Initializing mandatory drivers...\n\n");
-        // PS2Returns response_ps2 = ps2general::init((FADTTable*)find_sdt(rsdt,"FACP"));
-        // if (response_ps2 != Success) {
-        //     if (response_ps2 == NoPS2Controller) {
-        //         fault(-403,"No PS/2 controller found.","PS/2 Controller");
-        //     } else if (response_ps2 == PS2Timeout) {
-        //         fault(-403,"Timed out while waiting for a response.","PS/2 Controller");
-        //     } else if (response_ps2 == SelfTestFailure) {
-        //         fault(-403,"Controller Self-Test failure.","PS/2 Controller");
-        //     } else if (response_ps2 == NoWorkingPorts) {
-        //         fault(-403,"No working ports.","PS/2 Controller");
-        //     } else {
-        //         fault(-403,nullptr,"PS/2 Controller");
-        //     }
-        // }
-        // Terminal::print("[");
-        //     Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
-        //     Terminal::print("] Initialized PS/2 Driver.");
-        //     Terminal::print("\n");
+        PS2Returns response_ps2 = ps2general::init((FADTTable*)find_sdt(rsdt,"FACP"));
+        if (response_ps2 != Success) {
+            if (response_ps2 == NoPS2Controller) {
+                fault(-403,"No PS/2 controller found.","PS/2 Controller");
+            } else if (response_ps2 == PS2Timeout) {
+                fault(-403,"Timed out while waiting for a response.","PS/2 Controller");
+            } else if (response_ps2 == SelfTestFailure) {
+                fault(-403,"Controller Self-Test failure.","PS/2 Controller");
+            } else if (response_ps2 == NoWorkingPorts) {
+                fault(-403,"No working ports.","PS/2 Controller");
+            } else {
+                fault(-403,nullptr,"PS/2 Controller");
+            }
+        }
+        Terminal::print("[");
+            Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
+            Terminal::print("] Initialized PS/2 Driver.");
+            Terminal::print("\n");
         
         
-        // response_ps2 = ps2keyboard::init(false);
-        // if (response_ps2 != Success) {
-        //     if (response_ps2 == PS2Timeout) {
-        //         fault(-403,"Timed out while waiting for a response.\n         (is the controller unresponsive?)","PS/2 Keyboard");
-        //     } else if (response_ps2 == NoAck) {
-        //         fault(-403,"Something should've been acknowledged, but wasn't.","PS/2 Keyboard");
-        //     } else {
-        //         fault(-403,nullptr,"PS/2 Controller");
-        //     }
-        // }
+        response_ps2 = ps2keyboard::init(false);
+        if (response_ps2 != Success) {
+            if (response_ps2 == PS2Timeout) {
+                fault(-403,"Timed out while waiting for a response.\n         (is the controller unresponsive?)","PS/2 Keyboard");
+            } else if (response_ps2 == NoAck) {
+                fault(-403,"Something should've been acknowledged, but wasn't.","PS/2 Keyboard");
+            } else {
+                fault(-403,nullptr,"PS/2 Controller");
+            }
+        }
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
             Terminal::print("] Initialized PS/2 Keyboard.");

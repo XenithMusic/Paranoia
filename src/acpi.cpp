@@ -161,7 +161,7 @@ ACPITables find_rsdt() {
 		// Early protected mode without paging, assuming A20 enabled:
 		rsdt = (RSDTDescriptor*)(uintptr_t)phys;
 		Terminal::print(parseInt(phys,stratus,16));
-		return {};
+		// return {};
 		table.header = rsdt->header;
 		size_t count = (table.header.length-sizeof(ACPISTDHeader))/sizeof(uint32_t);
 		table.count = count;

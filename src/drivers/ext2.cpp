@@ -168,12 +168,12 @@ namespace ext2 {
             Terminal::print(" ");
 
         disk::get_bytes(constructed->index,constructed->partition,bgdAddress,bgdBytes,constructed->fs.ext2->bgdt);
-        if (not Allocator::is_allocated(constructed->fs.ext2->bgdt + 62)) {
+        if (not Allocator::is_allocated(constructed->fs.ext2->bgdt + 31)) {
             Terminal::print("\nIT'S NOT ALLOCATED FOR SOME GOD DAMN REASON WTF BRO\n");
         }
-            Terminal::print(parseInt((size_t)(constructed->fs.ext2->bgdt + 62),10));
+            Terminal::print(parseInt((size_t)(constructed->fs.ext2->bgdt + 31),10));
             Terminal::print(" ");
-            Terminal::print(parseInt(constructed->fs.ext2->bgdt[62].inode_table_addr,10));
+            Terminal::print(parseInt(constructed->fs.ext2->bgdt[31].inode_table_addr,10));
             Terminal::print("\n");
 
         // int i=0;
@@ -354,9 +354,9 @@ namespace ext2 {
         uint8_t* userBuffer = (uint8_t*)buffer;
         size_t accumulated = 0;
         for (size_t block=startBlockIndex;block <= endBlockIndex;block++) {
-            Terminal::print("(read_inode) block: ");
-                Terminal::print(parseU32(block,10));
-                Terminal::print("\n");
+            Terminal::printdebug("(read_inode) block: ");
+                Terminal::printdebug(parseU32(block,10));
+                Terminal::printdebug("\n");
             read_inode_block(fs,inode,block,tempBuffer);
             size_t srcOffset = 0;
             size_t endOffset = 0;
@@ -387,13 +387,13 @@ namespace ext2 {
                     entry->metadata.inode != 0) 
                     {
                     int comparison = kmemcmp(entry->name,child_name,entry->metadata.name_len);
-                    Terminal::print("... ");
-                        Terminal::print(entry->name);
-                        Terminal::print(" at length ");
-                        Terminal::print(parseInt(entry->metadata.name_len,10));
-                        Terminal::print(" compared to ");
-                        Terminal::print(parseInt(comparison,10));
-                        Terminal::print("\n");
+                    Terminal::printdebug("... ");
+                        Terminal::printdebug(entry->name);
+                        Terminal::printdebug(" at length ");
+                        Terminal::printdebug(parseInt(entry->metadata.name_len,10));
+                        Terminal::printdebug(" compared to ");
+                        Terminal::printdebug(parseInt(comparison,10));
+                        Terminal::printdebug("\n");
                     if (comparison == 0) {
                         child = entry;
                         goto child_found;

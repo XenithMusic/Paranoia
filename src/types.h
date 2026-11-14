@@ -133,8 +133,8 @@ enum MBlockState : char {
 };
 
 struct MBlock {
-    bool isEnd = true; // if false, there is another block in this sequence.
-    enum MBlockState state = RSRV;
+    bool isEnd; // if false, there is another block in this sequence.
+    enum MBlockState state;
 };
 
 struct AllocHeader {

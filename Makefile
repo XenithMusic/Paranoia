@@ -1,6 +1,7 @@
 # Makefile for building a simple kernel with i686-elf-gcc
 
 CONST = # Constants
+STRIP ?= 0
 
 # Paths to tools
 AS = i386-elf-as
@@ -8,19 +9,50 @@ CC = i386-elf-g++
 LD = i386-elf-gcc
 OBJCP = i386-elf-objcopy
 GRUB = grub-mkrescue
+STRIPPER = strip
 
 # Flags for the compiler and linker
-CFLAGS = -ffreestanding -g -m32 -nostdlib -O2 -Wall -Wextra -fno-exceptions -fno-rtti -Isrc/
+CFLAGS = -ffreestanding -m32 -nostdlib -O2 -Wall -Wextra -fno-exceptions -fno-rtti -Isrc/
 LDFLAGS = -T linker.ld -ffreestanding -O2 -nostdlib -lgcc -Isrc/
 
 CFLAGS += $(CONST)
 
+ifeq ($(STRIP),0)
+	CFLAGS += -g
+endif
+
+# UACPI
+
+UACPI_DIR = third_party/uacpi
+
+CFLAGS += -I$(UACPI_DIR)/include
+
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = boot.o paranoia.o terminal.o string.o utils.o serial.o pit.o math.o memory.o fail.o idt.o idtroutine.o gdt.o isrs.o syscall.o driver_framebuf.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
+OBJ_FILES = data.o boot.o paranoia.o terminal.o string.o utils.o serial.o pit.o math.o memory.o fail.o idt.o font.o idtroutine.o gdt.o isrs.o syscall.o driver_framebuf.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
+
+# # uACPI configuration
+# OBJ_FILES += $(UACPI_OBJ)
+
+# UACPI_DIR = third_party/uacpi
+# UACPI_CC = i386-elf-gcc
+
+# UACPI_SRC = $(shell find $(UACPI_DIR)/source -name '*.c')
+# UACPI_OBJ = $(patsubst $(UACPI_DIR)/%.c,bin/uacpi/%.o,$(UACPI_SRC))
+
+# UACPI_CFLAGS = -ffreestanding -m32 -nostdlib -O2 \
+#                -Wall -Wextra -fno-builtin \
+#                -I$(UACPI_DIR)/include
+
+# # Compile uACPI
+# bin/uacpi/%.o: $(UACPI_DIR)/%.c
+# 	mkdir -p $(dir $@)
+# 	$(UACPI_CC) $(UACPI_CFLAGS) -c $< -o $@
+
+# CFLAGS += -I$(UACPI_DIR)/include
 
 # The default target
 all: $(ISO_IMAGE)
@@ -38,6 +70,9 @@ isras.o: src/isr.s
 serial.o: src/serial.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
+data.o: src/data.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 paranoia.o: src/paranoia.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -48,6 +83,9 @@ string.o: src/string.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 math.o: src/math.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+font.o: src/font.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 memory.o: src/memory.cpp
@@ -122,6 +160,9 @@ scheduler.o: src/scheduler.cpp
 # Link the kernel
 $(KERNEL): $(OBJ_FILES)
 	$(LD) $(LDFLAGS) -o $(KERNEL) $(OBJ_FILES)
+ifeq ($(STRIP),2)
+	$(STRIPPER) --strip-all bin/paranoia.bin
+endif
 
 	# Make the kernel bootable by adding the multiboot header and padding it to a 512-byte boundary
 	$(OBJCP) --pad-to=512 $(KERNEL)

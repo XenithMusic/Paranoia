@@ -20,6 +20,8 @@
 #define IDT_ENTRIES_SIZE sizeof(IDTEntry)*IDT_ENTRIES
 
 namespace IDT {
+    char str1[256];
+    char str2[256];
     static void** table;
     IDTEntry* entries;
     static bool userspaces[IDT_ENTRIES];
@@ -56,7 +58,7 @@ namespace IDT {
     void pageFault(int index,InterruptFrame* frame, uint32_t errorCode) {
         uint32_t cr2 = 0;
         __asm__ volatile ("mov %%cr2, %0" : "=r"(cr2));
-        fault(-702,parseU32(errorCode, 16),parseU32(cr2,16));
+        fault(-702,parseU32(errorCode,str1,16),parseU32(frame->cs,str2,16));
     }
     void harshFaultHandler(int index,InterruptFrame* frame, uint32_t errorCode) {
         warn("Critical fault! (index ");

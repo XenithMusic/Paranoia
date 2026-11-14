@@ -12,7 +12,7 @@ You should have received a copy of the GNU General Public License along with Par
 
 */
 
-
+void markactivity(const char* label);
 void setError(int errno);
 void assert(bool dontcrash);
 int getError();

@@ -11,6 +11,7 @@
 #include "fail.h"
 #include "acpi.h"
 #include "page.h"
+#include "font.h"
 #include "gdt.h"
 #include "idt.h"
 #include "isr.h"
@@ -93,12 +94,25 @@ extern "C" {
     void PagingInitialized(multiboot_info_t* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
 
+        markactivity("init.alloc");
         Allocator::init();
+        
+        markactivity("init.framebuf");
+        framebuf_t buffer = Framebuffer::init(mbi);
+        Paging::mapArbitraryRange(g_pd,0x30000000,(uint32_t)buffer.address,buffer.pitch*buffer.height,0x3);
+        // *(volatile uint32_t*)(0x30000000) = 0x00FFFFFF;
+        Framebuffer::vaddr(0x30000000);
+        Framebuffer::drawpx(10,10,0x00FFFFFF);
 
+        markactivity("init.idt");
         IDT::init();
+        markactivity("init.idt.defaults");
         IDT::addDefaults();
+
+        markactivity("init.idt.finish");
         IDT::finish();
 
+        markactivity("test.paging.1");
         void* phys_page = Paging::kalloc4K();
         if (phys_page == nullptr) {
             fault(-103,"page is null","paranoia.PagingInitialized");
@@ -106,6 +120,7 @@ extern "C" {
         if ((uintptr_t)phys_page&0xFFF) {
             fault(-103,"page isnt aligned","paranoia.PagingInitialized");
         }
+        markactivity("test.paging.2");
         Paging::mapArbitraryRange(g_pd,0x400000,(uint32_t)phys_page,80,0x7);
         uint8_t* test = (uint8_t*)phys_page;
         test[0] = 0xAA;
@@ -114,18 +129,26 @@ extern "C" {
             fault(-103,"page did not write","paranoia.PagingInitialized");
         }
 
+        markactivity("init.serial");
         Serial::init();
 
-        framebuf_t buffer = Framebuffer::init(mbi);
-        Paging::mapArbitraryRange(g_pd,0x30000000,(uint32_t)buffer.address,buffer.pitch*buffer.height,0x3);
-        // *(volatile uint32_t*)(0x30000000) = 0x00FFFFFF;
-        Framebuffer::vaddr(0x30000000);
-        Framebuffer::drawpx(10,10,0x00FFFFFF);
+        // char path[] = "/primary/sys/fonts/font_0000.raw";
+        // VFS::File file = VFS::getFileFromPath(path);
+        markactivity("init.font");
+        Font::init();
+        markactivity("load.font");
+        Font::loadFallbackFont();
+        markactivity("test.font");
+        Font::print(5, 5, "hello, world!");
 
         // Backlog of pre-terminal init
+        markactivity("init.terminal");
         Terminal::init();
+        markactivity("config.terminal.1");
         Terminal::setCursorConfig((0xE << 4) | 0xF);
+        markactivity("config.terminal.2");
         Terminal::enableCursor();
+        markactivity("update.terminal");
         Terminal::print("\n:: CPU INIT\n\n");
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" GDT initialized.");
@@ -135,6 +158,10 @@ extern "C" {
             Terminal::print("\n");
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" Terminal initialized.");
+            Terminal::print("\n");
+        Terminal::print("[");
+        Terminal::print("[TIME UNKNOWN]");
+            Terminal::print(" IDT initialized.");
             Terminal::print("\n");
         Terminal::print("framebuffer bpp:");
             Terminal::print(parseInt(mbi->framebuffer_bpp, 10));
@@ -146,16 +173,21 @@ extern "C" {
             Terminal::print(parseU32(mbi->framebuffer_addr, 16));
             Terminal::print(" !!!");
 
+        markactivity("init.getrsdt");
+        rsdt = find_rsdt();
+        if (rsdt.isValid == false) {
+            fault(-500,"RSDT is not valid.");
+        }
+
         // #warning "The RSDT is being replaced with NULL; VERY dangerous, and WILL result in unintended behavior."
         // #warning "If you see this while compiling, PLEASE REPORT THIS AS A BUG."
 
+        markactivity("init.pit");
         set_pit_count(0);
 
         Terminal::print("[TIME UNKNOWN]");
             Terminal::print(" PIT reset, time is measured in seconds since this message.");
             Terminal::print("\n");
-
-        rsdt = find_rsdt();
         // ACPITables rsdt = {};
 
         // if (rsdt.isValid == false) {
@@ -169,20 +201,10 @@ extern "C" {
         // }
 
         // INTERRUPTS
-
-        Terminal::print("\n:: INTERRUPTS (");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print(")\n\n");
-        
-        // initIDT(idt);
-
-        Terminal::print("[");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] IDT initialized.");
-            Terminal::print("\n");
         
         g_mbi = mbi;
 
+        markactivity("MAJOR.RESTACK");
         __asm__ __volatile__ (
             "mov %0, %%esp\n"
             "xor %%ebp, %%ebp\n"
@@ -194,24 +216,44 @@ extern "C" {
         // if (!(g_mbi->flags & (1<<12))) {
         //     fault(-1000,"Expected a framebuffer.","PostRestack");
         // }
-
+        markactivity("postrestack");
         {
 
             Terminal::print("\n:: DRIVERS (");
                 Terminal::print(parseDouble(get_pit_seconds(),str,10));
                 Terminal::print(")\n\n");
             
+
+            markactivity("init.drivers");
             drivermanager::init(&rsdt,g_mbi);
 
-            VFS::mount(VFS::FilesystemType::ext2,disk::ATA,disk_ata::ATADrive::MASTER,0,"primary");
+            Terminal::print("Mounting FS\n");
+            markactivity("vfs.mountprimary");
+            fsid_t fs = VFS::mount(VFS::FilesystemType::ext2,disk::ATA,disk_ata::ATADrive::MASTER,0,"primary");
+            if (fs == (fsid_t)(-1)) {
+                warn("file system failed to mount! VFS commands addressing the primary filesystem will fail.");
+            } else {
+                Terminal::print("Mounted FS\n");
+            }
         }
         {
+            markactivity("vfs.getkernelsize");
             char path[] = "/primary/sys/state/compiled/kernelsize";
+            markactivity("vfs.getfilefrompath");
             VFS::File file = VFS::getFileFromPath(path);
-            fid_t fid = VFS::openFile(file);
             double kernelSize = 0;
-            VFS::readFile(fid,0,sizeof(double),&kernelSize);
-            VFS::closeFile(fid);
+            if (file.valid) {
+                markactivity("vfs.openfile");
+                fid_t fid = VFS::openFile(file);
+                kernelSize = 0;
+                markactivity("vfs.readfile");
+                VFS::readFile(fid,0,sizeof(double),&kernelSize);
+                markactivity("vfs.closefile");
+                VFS::closeFile(fid);
+            } else {
+                warn("Failed to open file from path!");
+            }
+            markactivity("sysinfo");
 
             Terminal::print("System information:\n");
             Terminal::print("KERNEL:               PARANOIA\n");
@@ -225,12 +267,13 @@ extern "C" {
                 Terminal::print(CONST_AUTHOR);
                 Terminal::print("\n");
             Terminal::print("- KERNEL SIZE:        ");
-                Terminal::print(parseDouble(kernelSize/MEBIBYTES,str,2));
-                Terminal::print("MiB\n");
+                Terminal::print(parseDouble(kernelSize/KIBIBYTES,str,2));
+                Terminal::print("KiB\n");
         }
 
         // START OF FS TESTING STUFF !!!
 
+        // markactivity("test.fs");
         // Terminal::print("mounting\n");
         // disk::Filesystem* primary = ext2::mount(disk::DriveType::ATA,disk_ata::ATADrive::MASTER,0);
         // if (primary == nullptr) {
@@ -289,6 +332,7 @@ extern "C" {
         // Terminal::print("ext2 mount test successful\n");
 
 
+        // markactivity("test.vectors");
         // Terminal::print("vector test\n");
         // Vector<char*> test;
         // test.open();
@@ -301,6 +345,7 @@ extern "C" {
         // test.close();
         // Terminal::print("test succeeded\n");
 
+        // markactivity("test.vfs");
         // Terminal::print("vfs test\n");
         // VFS::init();
         // Terminal::print("mounting\n");
@@ -332,6 +377,7 @@ extern "C" {
         // (this succeeded last time i checked)
         // (this also writes across a section boundary, which was why it broke previously. fixed that bug tho)
         //
+        // markactivity("test.vfs.write");
         // char* test = "abcdefghijklmnopqrstuvwxyz\0\0\0\0\0\0";
         // Terminal::print(test);
         //     Terminal::print("\n\n");
@@ -344,19 +390,22 @@ extern "C" {
         // Terminal::print(test);
         //     Terminal::print("\n\n");
 
+        markactivity("services");
         {
             Terminal::print("\n:: SERVICES (");
                 Terminal::print(parseDouble(get_pit_seconds(),str,10));
                 Terminal::print(")\n\n");
             {
-                scheduler::init();
-                Terminal::print("[");
-                    Terminal::print(parseDouble(get_pit_seconds(),str,10));
-                    Terminal::print("] Scheduler initialized.");
-                    Terminal::print("\n");
+            // markactivity("init.scheduler");
+            //     scheduler::init();
+            //     Terminal::print("[");
+            //         Terminal::print(parseDouble(get_pit_seconds(),str,10));
+            //         Terminal::print("] Scheduler initialized.");
+            //         Terminal::print("\n");
             }
         }
         
+        // markactivity("test.fs.2");
         // ext2::Superblock* superblock;
         // ext2::get_superblock(superblock);
         // ext2::BlockGroupDescriptor bgd_table[superblock->total_blocks / superblock->group_blocks + 1];
@@ -368,24 +417,27 @@ extern "C" {
         // ext2::read_block(0,4096,buffer);
         // Terminal::print(buffer);
 
-
-        char temporaryProcessPath[] = "/primary/demo/helloearly.lex";
-        warn("A temporary .LEX init process is being used. (");
-        warn(temporaryProcessPath);
-        warn("This should not be seen in a stable release.");
-        scheduler::Process* initProcess = LEXLoader::loadLEXIntoMemory(temporaryProcessPath,0);
-        Terminal::print("\n[");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] Found init executable.");
-            Terminal::print("\n");
-        // process::load_bin((void*)0x400000,src_inode,128);
-        scheduler::addProcess(initProcess);
-        Terminal::print("[");
-            Terminal::print(parseDouble(get_pit_seconds(),str,10));
-            Terminal::print("] Created init process.");
-            Terminal::print("\n");
+        // char temporaryProcessPath[] = "/primary/demo/helloearly.lex";
+        // warn("A temporary .LEX init process is being used. (");
+        // warn(temporaryProcessPath);
+        // warn("This should not be seen in a stable release.");
+        // markactivity("sched.loadinit");
+        // scheduler::Process* initProcess = LEXLoader::loadLEXIntoMemory(temporaryProcessPath,0);
+        // Terminal::print("\n[");
+        //     Terminal::print(parseDouble(get_pit_seconds(),str,10));
+        //     Terminal::print("] Found init executable.");
+        //     Terminal::print("\n");
+        // // markactivity("sched.loadinit");
+        // // process::load_bin((void*)0x400000,src_inode,128);
+        // markactivity("sched.addinit");
+        // scheduler::addProcess(initProcess);
+        // Terminal::print("[");
+        //     Terminal::print(parseDouble(get_pit_seconds(),str,10));
+        //     Terminal::print("] Created init process.");
+        //     Terminal::print("\n");
         
         
+        // markactivity("sched.tickonce");
         // scheduler::tick();
         // while (1){}
 
@@ -410,23 +462,27 @@ extern "C" {
         // Terminal::print(parseDouble(get_pit_seconds(),str,10));
         // Terminal::print(" fourth call\n");
 
+        markactivity("handoff");
         Terminal::print("\n:: HANDOFF (");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
             Terminal::print(")\n\n");
 
         #ifdef CONST_DEBUGGING
+        markactivity("test.paging");
         if (Paging::is_paging_enabled())
             Terminal::print("[DEBUG CHECK] Paging is enabled.\n");
         else {
             Terminal::print("[DEBUG CHECK] Paging is disabled.\n");
         }
 
+        markactivity("test.paging.near");
         Terminal::printdebug("Testing near memory...\n");
         char* character = (char*)0x10000;
         character[0] = 'A';
         if (*character == 'A')
             Terminal::printdebug("[DEBUG CHECK] Succeeded.\n");
 
+        markactivity("test.paging.far");
         // Terminal::printdebug("Testing far memory...\n");
         // character = (char*)0x1000000;
         // character[0] = 'A';
@@ -436,6 +492,7 @@ extern "C" {
 
         double lastTick = 0;
         double tick = 0;
+        markactivity("sched.enter");
 
         Terminal::print("[");
             Terminal::print(parseDouble(get_pit_seconds(),str,10));
@@ -444,11 +501,16 @@ extern "C" {
 
         Terminal::print("something after that. Trademark.");
 
+        markactivity("mainloop");
+        // fault(69420, "Testing activity text in the bottom right corner.");
         while (1) {
+            markactivity("mainloop.idtqueue");
             IDT::handleQueue();
+            markactivity("mainloop.pit");
             tick = get_pit_seconds();
             if (lastTick+0.01 < tick) {
                 lastTick = tick;
+                markactivity("mainloop.ps2-run");
                 if (ps2keyboard::keysDown[KeyCode::MODIF_ANY_CONTROL] and 
                     ps2keyboard::keysDown[KeyCode::MODIF_ANY_SHIFT] and 
                     not ps2keyboard::keysDown[KeyCode::MODIF_ANY_ALT] and 
@@ -473,6 +535,7 @@ extern "C" {
                         }
                     }
                 }
+                markactivity("mainloop.ps2-proc");
                 ps2keyboard::processScancodes();
             }
             // if (ps2keyboard::state.state == EatingScancode)
@@ -483,6 +546,7 @@ extern "C" {
         AfterAllProcesses();
     }
     void AfterAllProcesses() {
+        markactivity("afterall");
         
         // TODO: Somehow, I need to shut down the computer. In the meantime, I'm just gonna print and halt.
         Terminal::clearScreen();

@@ -173,3 +173,7 @@ char* parseDouble(double inNum, char* str, int precision) {
 
     return str;
 }
+
+char* parseDouble(double inNum, int precision) {
+    return parseDouble(inNum,buffer,precision);
+}

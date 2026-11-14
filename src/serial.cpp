@@ -28,7 +28,7 @@ namespace Serial {
         return false;
         #endif
     }
-    void write(char c) {
+    void write(const char c) {
         #ifdef CONST_DEBUGGING
         if (c == '\n') {
             write('\r');
@@ -37,7 +37,7 @@ namespace Serial {
         outb(COM1,c);
         #endif
     }
-    void print(char* c) {
+    void print(const char* c) {
         size_t i = 0;
         while (c[i] != 0) {
             write(c[i]);

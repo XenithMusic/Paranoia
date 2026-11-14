@@ -34,7 +34,7 @@ fi
 
 # create disk
 echo "[build_filesystem_v2] Creating image."
-dd if=/dev/zero of=filesystem.img bs=1M count=256 conv=sparse
+dd if=/dev/zero of=filesystem.img bs=1M count=128 conv=sparse
 if [[ "$MODE" == "bios" ]]; then
     parted filesystem.img mklabel msdos # mbr table
 else

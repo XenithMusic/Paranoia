@@ -3,6 +3,7 @@
 #include "fail.h"
 #include "string.h"
 #include "const.h"
+#include "types.h"
 
 /*
 
@@ -42,7 +43,8 @@ namespace ps2general {
     const uint32_t PS2_PRESENT_FLAG = 0x02;
 
     bool verifyPS2Controller(FADTTable* table) {
-        return (table->flags & PS2_PRESENT_FLAG) != 0x00;
+        if ((table->flags & PS2_PRESENT_FLAG) != 0x00) return true;
+        return false;
     }
     void sendCommand(uint8_t command) {
         outb(COMMAND_PORT,command);
@@ -105,8 +107,11 @@ namespace ps2general {
     }
     PS2Returns init(FADTTable* table) {
         cli();
+        PS2Returns selftestfailReturn = SelfTestFailure;
+        PS2Returns timeoutReturn = PS2Timeout;
         if (not verifyPS2Controller(table)) {
-            return NoPS2Controller;
+            timeoutReturn = NoPS2Controller;
+            selftestfailReturn = NoPS2Controller; // NOT DEFINITIVE, ESPECIALLY ON ACPI 1.0.
         }
 
         // DISABLE PORTS
@@ -124,10 +129,10 @@ namespace ps2general {
         uint8_t config = fetchConfigurationByte();
 
         if (config == TIMEOUT_PSEUDO) {
-            return PS2Timeout;
+            return timeoutReturn;
         }
 
-        config &= 0b10111111; // clear bit ~~6~~ (bit 6 enables translating set 2 to set 1.)
+        config &= 0b10111100; // clear bit ~~6~~ (bit 6 enables translating set 2 to set 1.)
         config |= 0b00000000; // set bit 0 and 6
 
         sendCommand16(WRITE_CONFIG_BYTE,config);
@@ -137,13 +142,14 @@ namespace ps2general {
         while (inb(0x64) & 2) {}
 
         sendCommand(SELF_TEST);
-        if (not waitForReadReady(10000)) {
-            return PS2Timeout;
+        if (not waitForReadReady(30000)) {
+            return selftestfailReturn;
         }
         uint8_t result = inb(DATA_PORT);
         if (result != 0x55) {
-            return SelfTestFailure;
+            return selftestfailReturn;
         }
+        // if we got here we know that the PS/2 controller is working
 
         sendCommand16(WRITE_CONFIG_BYTE,config); // fix the configuration because sometimes selftest resets the config
 

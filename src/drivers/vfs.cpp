@@ -59,6 +59,7 @@ namespace VFS {
                 Terminal::printdebug("\n");
         }
         (filesystems).add(constructed);
+        constructed->valid = true;
         return filesystems.length-1;
     }
     bool unmount(fsid_t fsid) {

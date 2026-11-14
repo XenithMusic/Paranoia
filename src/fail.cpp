@@ -1,7 +1,9 @@
 #include "terminal.h"
 #include "string.h"
 #include "serial.h"
+#include "memory.h"
 #include "utils.h"
+#include "types.h"
 #include "pit.h"
 
 #define COM1 0x3F8
@@ -21,6 +23,18 @@ You should have received a copy of the GNU General Public License along with Par
 
 int error;
 char* str_fail; // pointer if anything demands a pointer
+
+char activity[128];
+
+void markactivity(const char* label) {
+	kmemset(activity, 0, sizeof(activity));
+	kmemcpy(activity, label, strlen(label));
+	// Terminal::print("\n:: ");
+	// 	Terminal::print(label);
+	// 	Terminal::print(" (");
+	// 	Terminal::print(parseDouble(get_pit_seconds(),10));
+	// 	Terminal::print(")\n\n");
+}
 
 void stackTrace(unsigned int MaxFrames)
 {
@@ -193,6 +207,16 @@ void fault(int errno,const char* string,const char* source) {
 
 		Terminal::print("  Failed to find the RSDP in the ACPI.\n");
 	}
+	if (errno == -501) {
+		Terminal::print("  ACPI failure.\n\n");
+
+		Terminal::print("  Failed to find the RSDT.\n");
+	}
+	if (errno == -502) {
+		Terminal::print("  ACPI failure.\n\n");
+
+		Terminal::print("  Failed to find an ACPI table.\n");
+	}
 	if (errno == -600) {
 		Terminal::print("  Fault from userspace.\n\n");
 
@@ -236,6 +260,19 @@ void fault(int errno,const char* string,const char* source) {
 
 		Terminal::print("  Refer to extra for errorCode.\n");
 	}
+
+	size_t xpos = Terminal::getWidth() - strlen(activity) - 0;
+	size_t ypos = Terminal::getHeight() - 1;
+
+	size_t oldx = Terminal::getCol();
+	size_t oldy = Terminal::getRow();
+
+	Terminal::setCol(xpos);
+	Terminal::setRow(ypos);
+	Terminal::print(activity);
+	Terminal::setCol(oldx);
+	Terminal::setRow(oldy);
+
 	setError(1000);
 }
 

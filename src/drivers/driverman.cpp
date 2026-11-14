@@ -33,7 +33,11 @@ namespace drivermanager {
         Terminal::print("[drivermanager::init @ ");
             Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
             Terminal::print("] Initializing mandatory drivers...\n\n");
-        PS2Returns response_ps2 = ps2general::init((FADTTable*)find_sdt(rsdt,"FACP"));
+        FADTTable* fadtTable = (FADTTable*)find_sdt(rsdt,"FACP");
+        if (fadtTable == nullptr) {
+            fault(-502,"Failed to find the FADT.");
+        }
+        PS2Returns response_ps2 = ps2general::init(fadtTable);
         if (response_ps2 != Success) {
             if (response_ps2 == NoPS2Controller) {
                 fault(-403,"No PS/2 controller found.","PS/2 Controller");

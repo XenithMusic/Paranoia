@@ -1,5 +1,12 @@
 import os,datetime,math,subprocess,argparse,sys,struct
 
+def embed(path):
+    data = b""
+    with open(path,"rb") as f:
+        data = f.read()
+    data = list(data)
+    return ",".join(str(x) for x in data)
+
 def fail(ret):
     print(f"""
 {COLOR_RED}*************
@@ -43,6 +50,8 @@ parser.add_argument("-s","--skip",action="store_true",default=False,
                     help="Skip compilation, only run.")
 parser.add_argument("-u","--uefi",action="store_true",default=False,
                     help="(experimental) Make a UEFI system instead of a BIOS system.")
+parser.add_argument("-S","--strip",action="count",default=0,
+                    help="Prevent generation of extra debug symbols. Vastly reduces file size. Pass twice to strip the remaining debug symbols.")
 args = parser.parse_args()
 QFLAGS = args.qemuflags
 QEMUPLATFORM = "i386"
@@ -51,6 +60,7 @@ if args.uefi:
     QFLAGS += " -bios /usr/share/edk2-ovmf/x64/OVMF.4m.fd"
     QEMUPLATFORM = "x86_64"
     BIOSMODE = "uefi"
+MAKEFLAGS = f"STRIP={args.strip}"
 
 
 COLOR_RED = "\033[31m"
@@ -86,7 +96,7 @@ if not args.skip:
     makeTemplates()
 
     # make iso
-    proc = subprocess.run(f"make -B {constants}",shell=True)
+    proc = subprocess.run(f"make -B {constants} {MAKEFLAGS}",shell=True)
     if proc.returncode != 0:
         fail(proc.returncode)
     # && qemu-img create -f qcow2 -b paranoia.iso -o backing_fmt=raw paranoia.img 512M && \

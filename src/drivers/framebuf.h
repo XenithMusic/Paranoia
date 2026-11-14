@@ -21,7 +21,10 @@ struct framebuf_t {
     FrameBufferType type;
 };
 namespace Framebuffer {
+    uint32_t getWidth();
+    uint32_t getHeight();
     framebuf_t init(multiboot_info_t* mbi);
     void vaddr(uint32_t virt);
+    uint32_t* getpxaddr(uint32_t x, uint32_t y);
     void drawpx(uint32_t x, uint32_t y, uint32_t col);
 }

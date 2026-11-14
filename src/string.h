@@ -22,3 +22,4 @@ char* parseInt(int inNum, int base);
 char* parseU32(uint32_t inNum, char* str, int base);
 char* parseU32(uint32_t inNum, int base);
 char* parseDouble(double inNum, char* str, int precision);
+char* parseDouble(double inNum, int precision);

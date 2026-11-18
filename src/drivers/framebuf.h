@@ -6,11 +6,6 @@ typedef union {
     int g;
     int b;
 } pixelColor;
-enum FrameBufferType {
-    INDEXED=0,
-    RGB=1,
-    EGA=2
-};
 struct framebuf_t {
     bool valid = false;
     uint8_t* address;

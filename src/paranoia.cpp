@@ -65,7 +65,7 @@ TODO:
 extern "C" {
 
     char* str; // pointer if anything demands a pointer
-    multiboot_info_t* g_mbi;
+    multiboot2_info_t* g_mbi;
     PageDirectory* g_pd;
     uint8_t* k_stack_top;
     uint8_t k_stack_new[65536];
@@ -73,10 +73,10 @@ extern "C" {
     ACPITables rsdt;
     TSS32 tss = {0};
 
-    void GDTinitialized(multiboot_info_t* mbi);    
-    void PagingInitialized(multiboot_info_t* mbi);
+    void GDTinitialized(multiboot2_info_t* mbi);    
+    void PagingInitialized(multiboot2_info_t* mbi);
     void AfterAllProcesses();
-    void kernel_main(multiboot_info_t* mbi) {
+    void kernel_main(multiboot2_info_t* mbi) {
         // Initialize GDT as the VERY FIRST THING YOU DO.
         GDTEntry* gdt = (GDTEntry*)0x1000; // Define GDT pointer at a fixed memory location
         k_stack_top = k_stack_new + sizeof(k_stack_new);
@@ -87,11 +87,11 @@ extern "C" {
         // Now that we have a GDT, we can continue kernel initialization.
         GDTinitialized(mbi);
     }
-    void GDTinitialized(multiboot_info_t* mbi) {
+    void GDTinitialized(multiboot2_info_t* mbi) {
         g_pd = Paging::initwkp(); // Initialize Paging as the VERY SECOND THING YOU DO.
         PagingInitialized(mbi);
     }
-    void PagingInitialized(multiboot_info_t* mbi) {
+    void PagingInitialized(multiboot2_info_t* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
 
         markactivity("init.alloc");

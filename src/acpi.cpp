@@ -71,26 +71,34 @@ void* find_signature(const void* signature, uint8_t* search, uint8_t* searchEnd)
 
 RSDPLegacyDescriptor* find_rsdp() {
 	uint16_t EBDA = *(volatile uint16_t*)EBDA_PTR;
-	uint32_t EBDA_TRUE = (uint32_t)EBDA << 4;
-	uint8_t* search = (uint8_t*)EBDA_TRUE;
-	uint8_t* searchEnd = search+1024;
+	uint8_t* search;
+	uint8_t* searchEnd;
+	void* returned;
+	if (EBDA != 0x00) {
+		uint32_t EBDA_TRUE = (uint32_t)EBDA << 4;
+		search = (uint8_t*)EBDA_TRUE;
+		searchEnd = search+1024;
 
-	void* returned = find_signature(RSDP_SIG,search,searchEnd);
+		returned = find_signature(RSDP_SIG,search,searchEnd);
 
-	if (returned != NULL)
+		if (returned != nullptr)
 
-		if (verify_rsdp_checksum((RSDPLegacyDescriptor*)returned)) {
-			return (RSDPLegacyDescriptor*)returned;
-		}
+			if (verify_rsdp_checksum((RSDPLegacyDescriptor*)returned)) {
+				return (RSDPLegacyDescriptor*)returned;
+			}
 
-	// for (; search < searchEnd; search+=ALIGNMENT) {
-	// 	if (kmemcmp(search,RSDP_SIG,8) == 0) {
-	// 		if (verify_rsdp_checksum((RSDPLegacyDescriptor*)search)) {
-	// 			// Terminal::print("Funden.\n");
-	// 			return (RSDPLegacyDescriptor*)search;
-	// 		}
-	// 	}
-	// }
+		// for (; search < searchEnd; search+=ALIGNMENT) {
+		// 	if (kmemcmp(search,RSDP_SIG,8) == 0) {
+		// 		if (verify_rsdp_checksum((RSDPLegacyDescriptor*)search)) {
+		// 			// Terminal::print("Funden.\n");
+		// 			return (RSDPLegacyDescriptor*)search;
+		// 		}
+		// 	}
+		// }
+
+	} else {
+		warn("EBDA is zero");
+	}
 
 	search = (uint8_t*)BIOS_START;
 	searchEnd = (uint8_t*)BIOS_END;
@@ -101,14 +109,18 @@ RSDPLegacyDescriptor* find_rsdp() {
 	// 	}
 	// }
 
+	Terminal::printdebug("..before..");
 	returned = find_signature(RSDP_SIG,search,searchEnd);
+	Terminal::printdebug("..after..");
 
-	if (returned != NULL)
+	Terminal::printdebug("..before..");
+	if (returned != nullptr)
 
 		if (verify_rsdp_checksum((RSDPLegacyDescriptor*)returned)) {
 			return (RSDPLegacyDescriptor*)returned;
 		}
 
+	Terminal::printdebug("..after..");
 	return NULL; // Not found
 }
 

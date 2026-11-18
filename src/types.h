@@ -68,6 +68,99 @@ typedef struct {
     uint32_t mmap_addr;
 } multiboot_info;
 
+enum FrameBufferType {
+    INDEXED=0,
+    RGB=1,
+    EGA=2
+};
+struct FrameBufferPaletteItem {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+};
+
+struct RSDPLegacyDescriptor {
+	char signature[8];		// "RSD PTR "
+	uint8_t checksum;		// Entire struct must sum to 0
+	char oem_id[6];
+	uint8_t revision;		// 0 = ACPI 1.0
+	uint32_t rsdt_address;	// 32-bit physical address of RSDT
+} __attribute__((packed));
+
+struct RSDPModernDescriptor {
+	char signature[8];		// "RSD PTR "
+	uint8_t checksum;		// Entire struct must sum to 0
+	char oem_id[6];
+	uint8_t revision;		// 0 = ACPI 1.0
+	uint32_t rsdt_address;	// 32-bit physical address of RSDT
+
+    uint32_t length;
+    uint64_t xsdt_address;
+    uint8_t extended_checksum;
+    uint8_t reserved[3];
+} __attribute__((packed));
+
+static_assert(sizeof(RSDPLegacyDescriptor) == 20);
+static_assert(sizeof(RSDPModernDescriptor) == 36);
+
+enum Multiboot2TagType : uint32_t {
+    TAG_END=0,
+    TAG_CMDLINE,
+    TAG_BOOTLOADER,
+    TAG_MODULE,
+    TAG_MEMMAP=6,
+    TAG_FRAMEBUFFER=8,
+    TAG_RSDP_OLD=14,
+    TAG_RSDP_NEW=15
+};
+
+namespace Multiboot2 {
+    struct FramebufferTag {
+        Multiboot2TagType type = TAG_FRAMEBUFFER;
+        uint32_t size;
+        uint64_t addr; // if this is greater than 0xFFFFFFFF, panic (i cannot address PAE). if this is greater than 0xFFFFFFFFF, the framebuffer is probably corrupt (as that's not even legal for PAE)
+        uint32_t pitch;
+        uint32_t width;
+        uint32_t height;
+        uint8_t bpp;
+        FrameBufferType buf_type;
+        uint8_t reserved;
+        union colorinfo {
+            struct Indexed {
+                uint32_t palette_num_colors;
+                FrameBufferPaletteItem palette[];
+            };
+            struct RGB {
+                uint8_t framebuffer_red_field_position;
+                uint8_t framebuffer_red_mask_size;
+                uint8_t framebuffer_green_field_position;
+                uint8_t framebuffer_green_mask_size;
+                uint8_t framebuffer_blue_field_position;
+                uint8_t framebuffer_blue_mask_size;
+            };
+        };
+    };
+    struct RSDPv1Tag {
+        Multiboot2TagType type = TAG_RSDP_OLD;
+        uint32_t size;
+        RSDPLegacyDescriptor rsdp;
+    };
+    struct RSDPv2Tag {
+        Multiboot2TagType type = TAG_RSDP_NEW;
+        uint32_t size;
+        RSDPModernDescriptor rsdp;
+    };
+}
+
+struct multiboot2_info_t {
+    uint32_t total_size;
+    uint32_t reserved;
+} __attribute__((packed));
+struct multiboot2_tag_t {
+    Multiboot2TagType type;
+    uint32_t size;
+} __attribute__((packed));
+
 struct multiboot_info_t {
     uint32_t flags;        // bitfield
 
@@ -1250,27 +1343,6 @@ struct stackframe {
     struct stackframe* ebp;
     uint32_t eip;
 };
-
-struct RSDPLegacyDescriptor {
-	char signature[8];		// "RSD PTR "
-	uint8_t checksum;		// Entire struct must sum to 0
-	char oem_id[6];
-	uint8_t revision;		// 0 = ACPI 1.0
-	uint32_t rsdt_address;	// 32-bit physical address of RSDT
-} __attribute__((packed));
-
-struct RSDPModernDescriptor {
-	char signature[8];		// "RSD PTR "
-	uint8_t checksum;		// Entire struct must sum to 0
-	char oem_id[6];
-	uint8_t revision;		// 0 = ACPI 1.0
-	uint32_t rsdt_address;	// 32-bit physical address of RSDT
-
-    uint32_t length;
-    uint64_t xsdt_address;
-    uint8_t extended_checksum;
-    uint8_t reserved[3];
-} __attribute__((packed));
 
 struct ACPISTDHeader {
     char signature[4];

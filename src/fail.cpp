@@ -80,8 +80,8 @@ void fault(int errno,const char* string,const char* source) {
 	cli(); // prevent interrupts causing unexpected fault exiting
 	char* str;
 	Terminal::init();
-	Terminal::clearScreen();
-	Terminal::setRow(0);
+	// Terminal::clearScreen();
+	// Terminal::setRow(0);
 	Terminal::print("A critical error (a FAULT) occurred in the Paranoia\n");
 		Terminal::print("kernel, and it needed to stop executing immediately.\n");
 	Terminal::print("DETAILS\n");

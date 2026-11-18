@@ -1,3 +1,36 @@
+.section .multiboot
+.align 8
+.set MAGIC,       0xE85250D6
+.set ARCH,        0
+.set LENGTH,      mb2_header_end - mb2_header_start
+.set CHECKSUM,    -(MAGIC + ARCH + LENGTH)
+mb2_header_start:
+.long MAGIC
+.long ARCH
+.long LENGTH
+.long CHECKSUM
+mb2_header_tags:
+// framebuffer
+.short 5 // type
+.short 0 // flags
+.long 20 // size
+.long 0 // framebuffer width
+.long 0 // framebuffer height
+.long 32 // framebuffer bpp
+// information request
+.short 1 // type
+.short 0 // flags
+.long 16 // size
+.long 14 // request ACPI old RSDP (as defined per ACPI1)
+.long 15 // request ACPI new RSDP (as defined per ACPI2+)
+// end
+.short 0 // type
+.short 0 // flags
+.long 8 // size
+mb2_header_end:
+
+
+
 /*
 This code is directly taken from the OSDev.org Bare Bones page.
 https://wiki.osdev.org/Bare_Bones
@@ -8,45 +41,6 @@ https://wiki.osdev.org/OSDev_Wiki:License
 General Disclaimer:
 https://wiki.osdev.org/OSDev_Wiki:General_disclaimer
 */
-
-/* Declare constants for the multiboot header. */
-.set ALIGN,    1<<0             /* align loaded modules on page boundaries */
-.set MEMINFO,  1<<1             /* provide memory map */
-.set VIDEO,    1<<2             /* request framebuffer */
-
-.set FLAGS,    ALIGN | MEMINFO | VIDEO  /* this is the Multiboot 'flag' field */
-.set MAGIC,    0x1BADB002       /* 'magic number' lets bootloader find the header */
-.set CHECKSUM, -(MAGIC + FLAGS) /* checksum of above, to prove we are multiboot */
-
-.set FB_WIDTH, 640
-.set FB_HEIGHT, 480
-.set FB_BIT, 32
-.set MODE_TYPE, 0 /* mode_type = framebuffer */
-
-/* 
-Declare a multiboot header that marks the program as a kernel. These are magic
-values that are documented in the multiboot standard. The bootloader will
-search for this signature in the first 8 KiB of the kernel file, aligned at a
-32-bit boundary. The signature is in its own section so the header can be
-forced to be within the first 8 KiB of the kernel file.
-*/
-.section .multiboot
-.align 4
-.long MAGIC
-.long FLAGS
-.long CHECKSUM
-
-/* ignore these; AOUT_KLUDGE is not set */
-.long 0 /* header_addr */
-.long 0 /* load_addr */
-.long 0 /* load_end_addr */
-.long 0 /* bss_end_addr */
-.long 0 /* entry_addr */
-
-.long MODE_TYPE
-.long FB_WIDTH
-.long FB_HEIGHT
-.long FB_BIT
 
 /*
 The multiboot standard does not define the value of the stack pointer register
@@ -94,6 +88,7 @@ _start:
     in assembly as languages such as C cannot function without a stack.
     */
     mov $stack_top, %esp
+    and $-16, %esp
 
     /*
     This is a good place to initialize crucial processor state before the
@@ -118,6 +113,7 @@ _start:
     preserved and the call is well defined.
     */
     push %ebx // pass kernel_main the multiboot info pointer!
+    sub $12, %esp
     call kernel_main
 
     /*

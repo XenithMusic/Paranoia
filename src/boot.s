@@ -11,19 +11,22 @@ mb2_header_start:
 .long CHECKSUM
 mb2_header_tags:
 // framebuffer
+.align 8
 .short 5 // type
 .short 0 // flags
 .long 20 // size
-.long 0 // framebuffer width
-.long 0 // framebuffer height
+.long 1024 // framebuffer width
+.long 768 // framebuffer height
 .long 32 // framebuffer bpp
 // information request
+.align 8
 .short 1 // type
 .short 0 // flags
 .long 16 // size
 .long 14 // request ACPI old RSDP (as defined per ACPI1)
 .long 15 // request ACPI new RSDP (as defined per ACPI2+)
 // end
+.align 8
 .short 0 // type
 .short 0 // flags
 .long 8 // size
@@ -112,8 +115,8 @@ _start:
     stack since (pushed 0 bytes so far), so the alignment has thus been
     preserved and the call is well defined.
     */
-    push %ebx // pass kernel_main the multiboot info pointer!
     sub $12, %esp
+    push %ebx // pass kernel_main the multiboot info pointer!
     call kernel_main
 
     /*

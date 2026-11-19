@@ -2,6 +2,7 @@
 *.iso
 *.img
 *.raw
+!font.raw
 *.log
 *.o
 *.code-workspace

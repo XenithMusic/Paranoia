@@ -41,21 +41,24 @@ namespace Terminal {
         return index / chrWidth;
     }
     void drawWholeScreen(void) {
+        if (table == nullptr) return;
         for (size_t i = 0;i < tableSize;i++) {
             size_t x = getX(i);
             size_t y = getY(i);
-            char ch = table[i];
-            if (ch == '\0') ch = ' ';
-            Font::blitCh(x,y,ch);
+            uint8_t* ch = table + i;
+            if (*ch == '\0') *ch = ' ';
+            Font::blitCh(x,y,*ch);
         }
     }
     void clearScreen(void) {
+        if (table == nullptr) return;
         cursorX = 0;
         cursorY = 0;
         kmemset(table, 0, tableSize);
         drawWholeScreen(); // this can be optimized with a specialized Framebuffer:clearScreen() call. unfortunately, i'm lazy.
     }
     void shiftUp(size_t rows) {
+        if (table == nullptr) return;
         if (rows >= chrHeight) {
             clearScreen();
             return;
@@ -66,6 +69,7 @@ namespace Terminal {
         drawWholeScreen();
     }
     void writeCh(const char ch,size_t x,size_t y) {
+        if (table == nullptr) return;
         table[getIndex(x,y)] = ch;
         Font::blitCh(x,y,ch);
     }

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "multiboot2.h"
 #include "scheduler.h"
 #include "terminal.h"
 #include "syscall.h"
@@ -73,10 +74,12 @@ extern "C" {
     ACPITables rsdt;
     TSS32 tss = {0};
 
-    void GDTinitialized(multiboot2_info_t* mbi);    
+    void PostRestack();
+    void GDTinitialized();    
     void PagingInitialized(multiboot2_info_t* mbi);
     void AfterAllProcesses();
     void kernel_main(multiboot2_info_t* mbi) {
+        g_mbi = mbi;
         // Initialize GDT as the VERY FIRST THING YOU DO.
         GDTEntry* gdt = (GDTEntry*)0x1000; // Define GDT pointer at a fixed memory location
         k_stack_top = k_stack_new + sizeof(k_stack_new);
@@ -85,11 +88,17 @@ extern "C" {
         // __attribute__((aligned(0x10))) 
         // IDTEntry* idt = (IDTEntry*)((uint32_t)gdt + gdtpointer.limit + 1); // Define IDT pointer immediately following the GDT
         // Now that we have a GDT, we can continue kernel initialization.
-        GDTinitialized(mbi);
+        markactivity("MAJOR.RESTACK");
+        __asm__ __volatile__ (
+            "mov %0, %%esp\n"
+            "xor %%ebp, %%ebp\n"
+            "call GDTinitialized\n"
+            : : "r"(k_stack_top) : "memory"
+        );
     }
-    void GDTinitialized(multiboot2_info_t* mbi) {
+    void GDTinitialized() {
         g_pd = Paging::initwkp(); // Initialize Paging as the VERY SECOND THING YOU DO.
-        PagingInitialized(mbi);
+        PagingInitialized(g_mbi);
     }
     void PagingInitialized(multiboot2_info_t* mbi) {
         // Set up basic environment (screen, interrupts, etc.)
@@ -98,7 +107,9 @@ extern "C" {
         Allocator::init();
         
         markactivity("init.framebuf");
-        framebuf_t buffer = Framebuffer::init(mbi);
+        Multiboot2::FramebufferTag* fbtag = Multiboot2::getFramebuf(mbi);
+        if (fbtag == nullptr) fault(-1001,"Framebuffer Tag not found.");
+        framebuf_t buffer = Framebuffer::init(fbtag);
         Paging::mapArbitraryRange(g_pd,0x30000000,(uint32_t)buffer.address,buffer.pitch*buffer.height,0x3);
         // *(volatile uint32_t*)(0x30000000) = 0x00FFFFFF;
         Framebuffer::vaddr(0x30000000);
@@ -164,17 +175,15 @@ extern "C" {
             Terminal::print(" IDT initialized.");
             Terminal::print("\n");
         Terminal::print("framebuffer bpp:");
-            Terminal::print(parseInt(mbi->framebuffer_bpp, 10));
+            Terminal::print(parseInt(fbtag->bpp, 10));
             Terminal::print(" type:");
-            Terminal::print(parseInt(mbi->framebuffer_type, 10));
-            Terminal::print(" flags:");
-            Terminal::print(parseInt(mbi->flags, 16));
+            Terminal::print(parseInt(fbtag->buf_type, 10));
             Terminal::print(" addr:");
-            Terminal::print(parseU32(mbi->framebuffer_addr, 16));
+            Terminal::print(parseU32(fbtag->addr, 16));
             Terminal::print(" !!!");
 
         markactivity("init.getrsdt");
-        rsdt = find_rsdt();
+        rsdt = find_rsdt(mbi);
         if (rsdt.isValid == false) {
             fault(-500,"RSDT is not valid.");
         }
@@ -203,14 +212,7 @@ extern "C" {
         // INTERRUPTS
         
         g_mbi = mbi;
-
-        markactivity("MAJOR.RESTACK");
-        __asm__ __volatile__ (
-            "mov %0, %%esp\n"
-            "xor %%ebp, %%ebp\n"
-            "call PostRestack\n"
-            : : "r"(k_stack_top) : "memory"
-        );
+        PostRestack();
     }
     void PostRestack() {
         // if (!(g_mbi->flags & (1<<12))) {
@@ -225,7 +227,7 @@ extern "C" {
             
 
             markactivity("init.drivers");
-            drivermanager::init(&rsdt,g_mbi);
+            drivermanager::init(&rsdt);
 
             Terminal::print("Mounting FS\n");
             markactivity("vfs.mountprimary");

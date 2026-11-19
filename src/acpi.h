@@ -20,6 +20,6 @@ RSDPLegacyDescriptor* find_rsdp();
 
 Pair<uint8_t,RSDPLegacyDescriptor*> validate_rsdp();
 
-ACPITables find_rsdt();
+ACPITables find_rsdt(multiboot2_info_t* mbi);
 
 void* find_sdt(ACPITables* tables, const char* signature);

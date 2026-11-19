@@ -29,7 +29,7 @@ enum DriverReturn {
 char* throwawayString;
 
 namespace drivermanager {
-    DriverReturn init(ACPITables* rsdt,multiboot_info_t* mbi) {
+    DriverReturn init(ACPITables* rsdt) {
         Terminal::print("[drivermanager::init @ ");
             Terminal::print(parseDouble(get_pit_seconds(),throwawayString,10));
             Terminal::print("] Initializing mandatory drivers...\n\n");

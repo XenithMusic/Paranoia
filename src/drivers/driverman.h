@@ -23,7 +23,7 @@ enum DriverReturn {
 };
 
 namespace drivermanager {
-    DriverReturn init(ACPITables* rsdt,multiboot_info_t* mbi);
+    DriverReturn init(ACPITables* rsdt);
 }
 
 namespace drivers {

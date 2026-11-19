@@ -4,16 +4,16 @@ CONST = # Constants
 STRIP ?= 0
 
 # Paths to tools
-AS = i386-elf-as
-CC = i386-elf-g++
-LD = i386-elf-gcc
-OBJCP = i386-elf-objcopy
+AS = i686-elf-as
+CC = i686-elf-g++
+LD = i686-elf-gcc
+OBJCP = i686-elf-objcopy
 GRUB = grub-mkrescue
 STRIPPER = strip
 
 # Flags for the compiler and linker
-CFLAGS = -ffreestanding -m32 -nostdlib -O2 -Wall -Wextra -fno-exceptions -fno-rtti -Isrc/
-LDFLAGS = -T linker.ld -ffreestanding -O2 -nostdlib -lgcc -Isrc/
+CFLAGS = -ffreestanding -m32 -O2 -nostdlib -Wall -Wextra -fno-exceptions -fno-rtti -Isrc/
+LDFLAGS = -T linker.ld -O2 -ffreestanding -nostdlib -lgcc -Isrc/
 
 CFLAGS += $(CONST)
 
@@ -29,7 +29,7 @@ CFLAGS += -I$(UACPI_DIR)/include
 
 # Output files
 KERNEL = bin/paranoia.bin
-OBJ_FILES = data.o boot.o paranoia.o terminal.o string.o utils.o serial.o pit.o math.o memory.o fail.o idt.o font.o idtroutine.o gdt.o isrs.o syscall.o driver_framebuf.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
+OBJ_FILES = data.o boot.o paranoia.o multiboot2.o terminal.o string.o utils.o serial.o pit.o math.o memory.o fail.o idt.o font.o idtroutine.o gdt.o isrs.o syscall.o driver_framebuf.o driver_mbr.o driver_ps2ctl.o driver_disk_ata.o driver_disk_generic.o driver_fs_ext2.o driver_vfs.o driver_lex.o driverman.o pic.o acpi.o page.o scheduler.o
 ISO_IMAGE = paranoia.iso
 
 ISO_DIR = iso
@@ -67,6 +67,9 @@ isras.o: src/isr.s
 	$(AS) $< -o $@
 
 # Compile the C code (with inline assembly)
+multiboot2.o: src/multiboot2.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
 serial.o: src/serial.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 

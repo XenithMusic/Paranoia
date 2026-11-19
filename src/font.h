@@ -7,7 +7,7 @@ namespace Font {
     void init();
     void loadFallbackFont();
     void loadFont(VFS::File fontfile);
-    uint32_t getPxOfCh(size_t x, size_t y, char sch);
-    void blitCh(uint32_t x, uint32_t y, char sch);
+    uint32_t getPxOfCh(size_t x, size_t y, const uint8_t sch);
+    void blitCh(uint32_t x, uint32_t y, const uint8_t sch);
     void print(uint32_t x, uint32_t y, const char* str);
 }

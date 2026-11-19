@@ -1,3 +1,4 @@
+#include "multiboot2.h"
 #include <stdint.h>
 #include <string.h>
 #include "types.h"
@@ -142,28 +143,28 @@ Pair<uint8_t,RSDPLegacyDescriptor*> validate_rsdp() {
 	// return {0x01,nullptr};
 }
 
-ACPITables find_rsdt() {
-	Pair<uint8_t,RSDPLegacyDescriptor*> rsdp = validate_rsdp();
+ACPITables find_rsdt(multiboot2_info_t* mbi) {
+	RSDPLegacyDescriptor* rsdp = Multiboot2::getLegacyRSDP(mbi);
 
 	ACPITables table;
 	table.isValid = true;
-	if (rsdp.second == nullptr) {
+	if (rsdp == nullptr) {
 		table.isValid = false;
-		table.count = rsdp.first;
+		table.count = rsdp->revision;
 		return table;
 	}
 
 	// Terminal::print(parseInt(rsdp.second->checksum,stratus,16));
 
-	if (rsdp.first >= 2) {
-		XSDTDescriptor* xsdt = (XSDTDescriptor*)((RSDPModernDescriptor*)(rsdp.second))->xsdt_address;
+	if (rsdp->revision >= 2) {
+		XSDTDescriptor* xsdt = (XSDTDescriptor*)((RSDPModernDescriptor*)(rsdp))->xsdt_address;
 		table.header = xsdt->header;
 		size_t count = (table.header.length-sizeof(ACPISTDHeader))/sizeof(uint64_t);
 		table.count = count;
 		table.isXsdt = true;
 		table.entries = xsdt->other_std;
 	} else {
-		RSDPLegacyDescriptor* descriptor = (RSDPLegacyDescriptor*)rsdp.second;
+		RSDPLegacyDescriptor* descriptor = (RSDPLegacyDescriptor*)rsdp;
 		// assert((((RSDPLegacyDescriptor*)(rsdp.second))->rsdt_address) != 0);
 		// Terminal::print(parseInt((int)rsdp.second,stratus,16));
 		uint32_t phys = descriptor->rsdt_address;

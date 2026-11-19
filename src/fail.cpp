@@ -255,6 +255,15 @@ void fault(int errno,const char* string,const char* source) {
 
 		Terminal::print("  Refer to extra for details.\n");
 	}
+	if (errno == -1001) {
+		Terminal::print("  The bootloader failed to provide a required\n");
+		Terminal::print("  multiboot field.\n");
+
+		Terminal::print("  Refer to extra for details.\n");
+	}
+	if (errno == -1002) {
+		Terminal::print("  The Multiboot header is missing or wrong.\n");
+	}
 	if (errno == -1100) {
 		Terminal::print("  General Protection Fault\n\n");
 

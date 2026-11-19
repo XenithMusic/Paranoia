@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os,datetime,math,subprocess,argparse,sys,struct
 
 def embed(path):
@@ -39,6 +40,7 @@ You should have received a copy of the GNU General Public License along with Par
 
 """
 
+print(sys.argv)
 parser = argparse.ArgumentParser()
 parser.add_argument("-k","--keepfs",action="store_true",default=False,
                     help="Prevents recreation of the filesystem.")
@@ -57,7 +59,7 @@ QFLAGS = args.qemuflags
 QEMUPLATFORM = "i386"
 BIOSMODE = "bios"
 if args.uefi:
-    QFLAGS += " -bios /usr/share/edk2-ovmf/x64/OVMF.4m.fd"
+    QFLAGS += " -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=$HOME/.local/share/qemu/OVMF_VARS_4M.fd"
     QEMUPLATFORM = "x86_64"
     BIOSMODE = "uefi"
 MAKEFLAGS = f"STRIP={args.strip}"

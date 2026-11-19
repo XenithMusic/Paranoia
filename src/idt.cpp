@@ -72,6 +72,7 @@ namespace IDT {
         __asm__ __volatile__("hlt"); // stop the state as soon as possible to preserve it
     }
     void irq1Handler(int index,InterruptFrame* frame, uint32_t errorCode) {
+        Serial::print("IRQ1");
         uint8_t status = inb(0x64);
         bool obf = status & (1 << 0);
         bool ismouse = status & (1 << 5); // HACK: Supposedly, bit 5 is inconsistent on very old hardware during controller transitions.

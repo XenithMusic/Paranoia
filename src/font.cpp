@@ -4,6 +4,7 @@
 #include "drivers/vfs.h"
 #include "drivers/framebuf.h"
 #include "data.h"
+#include "serial.h"
 
 namespace Font {
     const size_t w = 8; // character width
@@ -32,7 +33,7 @@ namespace Font {
         fontMem = (uint32_t*)Allocator::kalloc(size);
         VFS::readFile(font, 0, size, fontMem);
     }
-    uint32_t getPxOfCh(size_t x, size_t y, const char sch) {
+    uint32_t getPxOfCh(size_t x, size_t y, const uint8_t sch) {
         if (fontLoaded == false) loadFallbackFont();
         if (x >= w || y >= h) return -1; // no negative check as x,y is unsigned. -1 is MAX
 
@@ -48,7 +49,7 @@ namespace Font {
 
         return fontMem[index];
     }
-    void blitCh(uint32_t x, uint32_t y, const char sch) {
+    void blitCh(uint32_t x, uint32_t y, const uint8_t sch) {
         size_t ax = x*w;
         size_t ay = y*h;
         for (size_t cx=0;cx < w;cx++) {

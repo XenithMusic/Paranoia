@@ -12,16 +12,25 @@ namespace Framebuffer {
     uint32_t getHeight() {
         return framebuf.height;
     }
-    framebuf_t init(multiboot_info_t* mbi) {
+    framebuf_t init(Multiboot2::FramebufferTag* fbtag) {
         framebuf = {
             true,
-            (uint8_t*)mbi->framebuffer_addr,
-            mbi->framebuffer_width,
-            mbi->framebuffer_height,
-            mbi->framebuffer_pitch,
-            mbi->framebuffer_bpp,
-            (FrameBufferType)mbi->framebuffer_type
+            (uint8_t*)fbtag->addr,
+            fbtag->width,
+            fbtag->height,
+            fbtag->pitch,
+            fbtag->bpp,
+            fbtag->buf_type
         };
+        // framebuf = {
+        //     true,
+        //     (uint8_t*)mbi->framebuffer_addr,
+        //     mbi->framebuffer_width,
+        //     mbi->framebuffer_height,
+        //     mbi->framebuffer_pitch,
+        //     mbi->framebuffer_bpp,
+        //     (FrameBufferType)mbi->framebuffer_type
+        // };
         if (framebuf.bpp != 32) return {};
         initialized = true;
         return framebuf;
@@ -50,6 +59,8 @@ namespace Framebuffer {
         return ptr;
     }
     void drawpx(uint32_t x, uint32_t y, uint32_t col) {
+        if (x > framebuf.width) return;
+        if (y > framebuf.height) return;
         uint32_t* volatile ptr = getpxaddr(x,y);
         if (ptr == nullptr) return;
         *ptr = col;

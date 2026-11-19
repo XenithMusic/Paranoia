@@ -96,7 +96,7 @@ echo "[build_filesystem_v2] Installing grub."
 if [[ "$MODE" == "bios" ]]; then
     sudo grub-install --target=i386-pc --boot-directory=./fsconst/primary/boot /dev/loop0 # BIOS
 else
-    sudo grub-install --target=x86_64-efi --boot-directory=./fsconst/primary/boot --efi-directory=./fsconst/esp --removable --no-nvram # UEFI
+    sudo grub-install --target=x86_64-efi --boot-directory=./fsconst/primary/boot --efi-directory=./fsconst/esp # UEFI
 fi
 
 # clean
